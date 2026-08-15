@@ -364,7 +364,27 @@ wss.on('connection', (ws, req) => {
         case 'HEARTBEAT': {
           if (currentPeerId && connectedPeers.has(currentPeerId)) {
             connectedPeers.get(currentPeerId).info.lastSeen = Date.now();
+          } else if (data.peer && data.peer.id) {
+            // Auto re-register peer if somehow missing
+            currentPeerId = data.peer.id;
+            connectedPeers.set(currentPeerId, {
+              ws,
+              info: {
+                ...data.peer,
+                joinedAt: Date.now(),
+                lastSeen: Date.now()
+              }
+            });
+            broadcast({
+              type: 'PEER_JOINED',
+              peer: data.peer,
+              peers: getPeerList()
+            }, ws);
           }
+          ws.send(JSON.stringify({
+            type: 'PEER_LIST_UPDATE',
+            peers: getPeerList()
+          }));
           break;
         }
 
@@ -386,17 +406,18 @@ wss.on('connection', (ws, req) => {
 
   ws.on('close', () => {
     if (currentPeerId && connectedPeers.has(currentPeerId)) {
-      const peerInfo = connectedPeers.get(currentPeerId).info;
-      connectedPeers.delete(currentPeerId);
-
-      broadcast({
-        type: 'PEER_LEFT',
-        peerId: currentPeerId,
-        peerName: peerInfo.name,
-        peers: getPeerList()
-      });
-
-      console.log(`[MeshHub] Peer left: ${peerInfo.name} (${currentPeerId})`);
+      const existing = connectedPeers.get(currentPeerId);
+      // ONLY delete if this socket is still the active socket for currentPeerId
+      if (existing && existing.ws === ws) {
+        connectedPeers.delete(currentPeerId);
+        broadcast({
+          type: 'PEER_LEFT',
+          peerId: currentPeerId,
+          peerName: existing.info.name,
+          peers: getPeerList()
+        });
+        console.log(`[MeshHub] Peer left: ${existing.info.name} (${currentPeerId})`);
+      }
     }
   });
 
@@ -405,23 +426,23 @@ wss.on('connection', (ws, req) => {
   });
 });
 
-// Clean up dead/closed sockets if inactive for > 90 seconds without dropping live proxy connections
+// Periodic safe cleanup for closed sockets
 const safeCleanupInterval = setInterval(() => {
-  const now = Date.now();
+  let changed = false;
   for (const [peerId, peer] of connectedPeers.entries()) {
-    if (peer.ws.readyState !== WebSocket.OPEN || (now - (peer.info.lastSeen || 0) > 90000)) {
-      try { peer.ws.close(); } catch (e) {}
+    if (peer.ws.readyState !== WebSocket.OPEN) {
       connectedPeers.delete(peerId);
-      broadcast({
-        type: 'PEER_LEFT',
-        peerId: peerId,
-        peerName: peer.info.name,
-        peers: getPeerList()
-      });
-      console.log(`[MeshHub] Cleaned up inactive peer: ${peer.info.name} (${peerId})`);
+      changed = true;
+      console.log(`[MeshHub] Cleaned up closed socket for peer: ${peer.info.name} (${peerId})`);
     }
   }
-}, 20000);
+  if (changed) {
+    broadcast({
+      type: 'PEER_LIST_UPDATE',
+      peers: getPeerList()
+    });
+  }
+}, 15000);
 
 wss.on('close', () => clearInterval(safeCleanupInterval));
 

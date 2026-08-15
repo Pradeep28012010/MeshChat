@@ -798,16 +798,15 @@
         peer: state.self
       }));
 
-      // Active client heartbeat & sync every 7 seconds
+      // Active client heartbeat & sync every 5 seconds
       if (clientHeartbeatInterval) clearInterval(clientHeartbeatInterval);
       clientHeartbeatInterval = setInterval(() => {
         if (state.ws && state.ws.readyState === WebSocket.OPEN) {
-          state.ws.send(JSON.stringify({ type: 'HEARTBEAT' }));
-          state.ws.send(JSON.stringify({ type: 'GET_PEERS' }));
+          state.ws.send(JSON.stringify({ type: 'HEARTBEAT', peer: state.self }));
         } else {
           scheduleReconnect();
         }
-      }, 7000);
+      }, 5000);
     };
 
     state.ws.onmessage = async (event) => {
