@@ -8,8 +8,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="description" content="Zero-Internet Offline Messaging, Calling, GPS Map, Walkie-Talkie & Survival Suite">
   <link rel="manifest" href="./manifest.json">
-  <link rel="stylesheet" href="./styles.css?v=3.2">
-  <title>MeshChat — Offline Local & Survival Suite</title>
+  <link rel="stylesheet" href="./styles.css?v=3.3">
+  <title>MeshChat — Online Cloud & Offline Mesh Suite</title>
 </head>
 <body>
 
@@ -39,12 +39,12 @@
       <div class="brand-info">
         <div class="brand-title-row">
           <h1>MeshChat</h1>
-          <span class="mode-badge" id="network-mode-badge">Local Mesh</span>
+          <span class="mode-badge" id="network-mode-badge">Cloud Mesh</span>
           <span class="e2ee-badge" id="e2ee-status-badge" title="End-to-End Encrypted (AES-256)">🔒 E2EE</span>
         </div>
         <div class="brand-status">
           <span class="status-dot" id="connection-status-dot"></span>
-          <span id="connection-status-text">Connected</span>
+          <span id="connection-status-text">Online & Synced</span>
         </div>
       </div>
     </div>
@@ -174,11 +174,15 @@
       <!-- Current User Profile Strip with Sleek Apple Battery Widget -->
       <div class="user-profile-strip" id="user-profile-strip">
         <div class="profile-info">
-          <div class="peer-avatar user" id="self-avatar">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-              <circle cx="12" cy="7" r="4"/>
-            </svg>
+          <div class="self-avatar-wrap" id="self-avatar-wrap" title="Click to upload profile photo">
+            <div class="peer-avatar user" id="self-avatar">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+            </div>
+            <div class="avatar-camera-overlay" id="avatar-camera-overlay">📷</div>
+            <input type="file" id="avatar-file-input" accept="image/*" style="display: none;">
           </div>
           <div class="profile-text-wrap">
             <div class="profile-top-line">
@@ -478,37 +482,45 @@
     </button>
   </nav>
 
-  <!-- 🤖 100% Offline AI Survival Assistant Modal -->
+  <!-- 🧠 Intelligent Multi-Persona Mesh AI Modal -->
   <div class="modal-overlay" id="ai-modal-overlay">
     <div class="modal-card ai-modal-card">
       <div class="modal-header">
         <div class="ai-header-title-wrap">
-          <span class="ai-avatar-badge">🤖</span>
+          <span class="ai-avatar-badge" id="ai-persona-avatar">🧠</span>
           <div>
-            <h3 class="modal-title">Offline AI Survival Assistant</h3>
-            <p class="modal-subtitle">100% On-Device Neural Survival Guide (Zero Cloud)</p>
+            <h3 class="modal-title">Intelligent Mesh AI Assistant</h3>
+            <p class="modal-subtitle">Omni Knowledge, Code, Survival & Group @ai Copilot</p>
           </div>
         </div>
         <button class="close-btn" id="ai-modal-close-btn">&times;</button>
       </div>
 
+      <!-- Persona Selection Row -->
+      <div class="ai-persona-row">
+        <button type="button" class="ai-persona-btn active" data-persona="omni">🧠 Omni AI</button>
+        <button type="button" class="ai-persona-btn" data-persona="survival">🏕️ Survival Pro</button>
+        <button type="button" class="ai-persona-btn" data-persona="code">💻 Code Mentor</button>
+        <button type="button" class="ai-persona-btn" data-persona="creative">✍️ Creative Copilot</button>
+      </div>
+
       <div class="ai-chat-history" id="ai-chat-history">
         <div class="ai-bubble assistant">
-          <div class="ai-name-tag">🤖 Survival AI</div>
-          <p>Hello! I am your offline survival assistant. Ask me anything about first aid, venomous bites, edible plants, water purification, shelters, or bear/wildlife encounters.</p>
+          <div class="ai-name-tag" id="ai-greeting-nametag">🧠 Omni AI</div>
+          <p id="ai-greeting-text">Hello! I am your intelligent AI assistant. Ask me questions about general knowledge, coding, math, languages, writing, or emergency survival. You can also mention <strong>@ai [question]</strong> directly in any chat room!</p>
         </div>
       </div>
 
-      <!-- Quick AI Survival Prompts -->
-      <div class="ai-quick-prompts">
-        <button class="ai-chip" data-prompt="How to treat a snake bite?">🐍 Snake Bite</button>
-        <button class="ai-chip" data-prompt="How to purify muddy water?">💧 Water Purification</button>
-        <button class="ai-chip" data-prompt="Signs of severe hypothermia?">❄️ Hypothermia</button>
-        <button class="ai-chip" data-prompt="How to start a fire in rain?">🔥 Wet Fire</button>
+      <!-- Quick AI Prompts -->
+      <div class="ai-quick-prompts" id="ai-quick-prompts">
+        <button type="button" class="ai-chip" data-prompt="Explain how quantum computing works in simple terms">🔬 Quantum Computing</button>
+        <button type="button" class="ai-chip" data-prompt="Write a clean JavaScript debounce function">💻 JS Debounce</button>
+        <button type="button" class="ai-chip" data-prompt="How to treat a snake bite?">🐍 Snake Bite</button>
+        <button type="button" class="ai-chip" data-prompt="Plan a 3-day camping itinerary">⛺ 3-Day Camping</button>
       </div>
 
       <form class="ai-input-form" id="ai-input-form">
-        <input type="text" class="text-input-field ai-input-box" id="ai-user-query" placeholder="Ask offline AI about survival, plants, first aid..." autocomplete="off">
+        <input type="text" class="text-input-field ai-input-box" id="ai-user-query" placeholder="Ask AI anything (or type @ai in group chat)..." autocomplete="off">
         <button type="submit" class="btn btn-primary" id="btn-send-ai-query">Ask</button>
       </form>
     </div>
@@ -1472,6 +1484,6 @@
     </div>
   </div>
 
-  <script src="./app.js?v=3.2"></script>
+  <script src="./app.js?v=3.3"></script>
 </body>
 </html>

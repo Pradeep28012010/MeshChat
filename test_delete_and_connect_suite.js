@@ -1,10 +1,14 @@
 const WebSocket = require('ws');
+const PORT = 3014;
+process.env.PORT = PORT;
+const server = require('./server.js');
 
 async function runDeleteAndConnectSuite() {
   console.log('Testing Deletions & Modernized Connect Suite...');
+  await new Promise(r => setTimeout(r, 400));
 
-  const wsA = new WebSocket('ws://localhost:3000');
-  const wsB = new WebSocket('ws://localhost:3000');
+  const wsA = new WebSocket(`ws://localhost:${PORT}`);
+  const wsB = new WebSocket(`ws://localhost:${PORT}`);
 
   await Promise.all([
     new Promise(res => wsA.on('open', res)),

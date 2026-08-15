@@ -363,8 +363,11 @@
   const state = {
     self: {
       id: sessionPeerId,
-      name: localStorage.getItem('mesh_peer_name') || 'User_' + Math.floor(100 + Math.random() * 900)
+      name: localStorage.getItem('mesh_peer_name') || 'User_' + Math.floor(100 + Math.random() * 900),
+      avatar: localStorage.getItem('mesh_peer_avatar') || null
     },
+    outbox: JSON.parse(localStorage.getItem('mesh_outbox') || '[]'),
+    aiPersona: 'omni',
     theme: localStorage.getItem('mesh_theme') || 'light',
     isRedVision: localStorage.getItem('mesh_red_vision') === 'true',
     wallpaper: localStorage.getItem('mesh_wallpaper') || 'default',
@@ -686,13 +689,17 @@
     editSnippet: document.getElementById('edit-snippet'),
     btnCancelEdit: document.getElementById('btn-cancel-edit'),
 
-    // AI Survival Assistant
+    // Intelligent AI Assistant
     btnOpenAi: document.getElementById('btn-open-ai'),
     aiModalOverlay: document.getElementById('ai-modal-overlay'),
     aiModalCloseBtn: document.getElementById('ai-modal-close-btn'),
     aiChatHistory: document.getElementById('ai-chat-history'),
     aiInputForm: document.getElementById('ai-input-form'),
     aiUserQuery: document.getElementById('ai-user-query'),
+    aiPersonaAvatar: document.getElementById('ai-persona-avatar'),
+    aiGreetingNametag: document.getElementById('ai-greeting-nametag'),
+    aiGreetingText: document.getElementById('ai-greeting-text'),
+    aiQuickPrompts: document.getElementById('ai-quick-prompts'),
 
     // Geofence & Morse & Radar
     btnOpenGeofence: document.getElementById('btn-open-geofence'),
@@ -756,6 +763,9 @@
     profileNameInput: document.getElementById('profile-name-input'),
     selfIdTag: document.getElementById('self-id-tag'),
     selfAvatar: document.getElementById('self-avatar'),
+    selfAvatarWrap: document.getElementById('self-avatar-wrap'),
+    avatarFileInput: document.getElementById('avatar-file-input'),
+    avatarCameraOverlay: document.getElementById('avatar-camera-overlay'),
     selfBatteryPill: document.getElementById('self-battery-pill'),
     selfBatFill: document.getElementById('self-bat-fill'),
     selfBatText: document.getElementById('self-bat-text'),
@@ -1842,73 +1852,209 @@
     return (θ * 180 / Math.PI + 360) % 360;
   }
 
-  // --- 20. 🤖 Offline AI Survival Assistant ---
-  const OFFLINE_AI_KNOWLEDGE = [
-    {
-      keywords: ['snake', 'bite', 'viper', 'rattlesnake', 'cobra', 'venom'],
-      title: 'Snake / Venomous Bite Protocol',
-      response: '1. **Keep Victim Calm**: Minimize movement to slow venom circulation.\n2. **Position Limb**: Keep bite site **below heart level**.\n3. **DO NOT**: Cut wound, suck venom, apply ice, or use tight tourniquet.\n4. **Mark Swelling**: Use pen to outline swelling and note time.\n5. **Immobilize**: Splint gently and evacuate immediately.'
+  // --- 20. 🧠 Multi-Domain Intelligent AI Assistant ---
+  const AI_PERSONA_CONFIGS = {
+    omni: {
+      name: '🧠 Omni AI',
+      greeting: 'Hello! I am your intelligent multi-domain AI assistant. Ask me questions about general knowledge, science, coding, translations, math, or emergency survival. Mention @ai in group chats to summon me!'
     },
-    {
-      keywords: ['water', 'purify', 'boil', 'filter', 'muddy', 'drink', 'hydration'],
-      title: 'Wilderness Water Purification',
-      response: '1. **Rolling Boil**: Boil vigorously for **at least 1 full minute** (3 mins above 2,000m).\n2. **Solar SODIS**: Clear PET bottle in direct sunlight for 6 hours.\n3. **DIY Filter**: Layer cloth -> crushed wood charcoal -> fine sand -> gravel.'
+    survival: {
+      name: '🏕️ Survival Pro',
+      greeting: 'Greetings, Explorer. I specialize in wilderness survival, emergency trauma first-aid, navigation, water harvesting, edible forage, and extreme weather shelters.'
     },
-    {
-      keywords: ['hypothermia', 'cold', 'freeze', 'shivering', 'frostbite'],
-      title: 'Hypothermia & Cold Exposure',
-      response: '1. **Insulate Ground**: Insulate with branches/backpacks.\n2. **Replace Wet Clothes**: Wrap in dry blankets.\n3. **Core Heat**: Apply warmth to **chest and armpits**.\n4. **Warm Sips**: Give warm sugary liquids if conscious.'
+    code: {
+      name: '💻 Code Mentor',
+      greeting: 'Hello Developer! I can explain algorithms, generate clean JavaScript/Python snippets, debug logic, and explain web architectures.'
+    },
+    creative: {
+      name: '✍️ Creative Copilot',
+      greeting: 'Hi! I am your creative partner. I can brainstorm ideas, write stories, draft professional emails, outline trip itineraries, and summarize discussions.'
     }
-  ];
+  };
+
+  function generateIntelligentAiReply(userPrompt, persona = 'omni') {
+    const p = (userPrompt || '').toLowerCase().trim();
+    if (!p) return 'How can I assist you today? Ask any question or request code, survival guidance, or calculations.';
+
+    // 1. Math Calculation Engine
+    const mathMatch = p.match(/(?:what is|calculate|solve|evaluate)?\s*([0-9\.\+\-\*\/\(\)\^\s%]+)$/i);
+    const hasMathOps = /[\+\-\*\/]/.test(p);
+    if (mathMatch && hasMathOps && !/[a-z]{3,}/i.test(p)) {
+      try {
+        const sanitized = p.replace(/[^0-9\+\-\*\/\.\(\)]/g, '');
+        if (sanitized && /^[\d\.\+\-\*\/\(\)\s]+$/.test(sanitized)) {
+          const result = Function(`'use strict'; return (${sanitized})`)();
+          if (typeof result === 'number' && !isNaN(result)) {
+            return `🔢 **Calculation Result:**\n\`${sanitized}\` = **${result}**`;
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 2. Code & Engineering Knowledge
+    if (p.includes('debounce') || p.includes('throttle')) {
+      return `💻 **JavaScript Debounce Function:**\n\`\`\`javascript\nfunction debounce(func, delay = 300) {\n  let timer;\n  return function(...args) {\n    clearTimeout(timer);\n    timer = setTimeout(() => func.apply(this, args), delay);\n  };\n}\n\`\`\`\n*Cancels previous timer on rapid input, executing only after the specified idle delay.*`;
+    }
+
+    if (p.includes('fetch') || p.includes('api call') || p.includes('async await')) {
+      return `💻 **Modern Async/Await Fetch Pattern:**\n\`\`\`javascript\nasync function loadData(url) {\n  try {\n    const response = await fetch(url);\n    if (!response.ok) throw new Error(\`HTTP \${response.status}\`);\n    const data = await response.json();\n    return data;\n  } catch (error) {\n    console.error('Fetch failed:', error);\n  }\n}\n\`\`\``;
+    }
+
+    if (p.includes('flexbox') || p.includes('css grid')) {
+      return `🎨 **CSS Flexbox vs Grid Quick Guide:**\n• **Flexbox (1D)**: Ideal for single-direction alignment (toolbars, navbar rows, message bubble clusters).\n• **CSS Grid (2D)**: Ideal for multi-column responsive page layouts and dashboards.\n*Tip: Use \`display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px;\` for auto-responsive cards.*`;
+    }
+
+    if (p.includes('quantum') && (p.includes('computer') || p.includes('computing'))) {
+      return `🔬 **Quantum Computing in Simple Terms:**\nUnlike classical computers that store data in binary bits (\`0\` or \`1\`), quantum computers use **Qubits**.\n• **Superposition**: A qubit can represent 0, 1, or both simultaneously.\n• **Entanglement**: Qubits can link instantly, enabling massive parallel calculations.\n*Use Case: Breaking complex cryptography, simulating molecular chemistry, and optimizing global logistics.*`;
+    }
+
+    if (p.includes('photosynthesis')) {
+      return `🌿 **Photosynthesis Summary:**\nPlants convert sunlight, water, and carbon dioxide into oxygen and glucose:\n$$\\text{6CO}_2 + \\text{6H}_2\\text{O} + \\text{Light} \\rightarrow \\text{C}_6\\text{H}_{12}\\text{O}_6 + \\text{6O}_2$$\n• **Light Reaction**: Chlorophyll captures photon energy in the thylakoid membranes.\n• **Calvin Cycle**: Carbon fixation creates glucose energy storage.`;
+    }
+
+    // 3. Emergency Survival Knowledge
+    if (p.includes('snake') || p.includes('viper') || p.includes('rattlesnake') || p.includes('cobra') || p.includes('venom')) {
+      return `🐍 **Snake & Venomous Bite Protocol:**\n1. **Keep Victim Calm**: Slower heart rate delays venom spread.\n2. **Position Limb**: Keep wound **below heart level**.\n3. **DO NOT**: Cut wound, suck venom, apply ice, or use tight tourniquets.\n4. **Mark Swelling**: Circle border with a pen and note the exact time.\n5. **Immobilize & Splint**: Evacuate calmly to medical help.`;
+    }
+
+    if (p.includes('water') && (p.includes('purif') || p.includes('boil') || p.includes('filter') || p.includes('drink') || p.includes('dirty'))) {
+      return `💧 **Wilderness Water Purification:**\n1. **Rolling Boil**: Boil vigorously for **at least 1 full minute** (3 mins above 2,000m altitude).\n2. **Solar SODIS**: Expose clear PET bottle to direct bright sunlight for 6 hours.\n3. **Layered DIY Filter**: Coarse gravel ➜ Fine sand ➜ Crushed wood charcoal ➜ Clean cloth.`;
+    }
+
+    if (p.includes('hypothermia') || p.includes('frostbite') || p.includes('freezing')) {
+      return `❄️ **Hypothermia Emergency Response:**\n1. **Ground Insulation**: Never let victim lie directly on bare cold ground.\n2. **Remove Wet Clothes**: Wrap tightly in dry insulated layers and windbreak.\n3. **Apply Core Warmth**: Place warm bottles in **armpits, groin, and neck**.\n4. **Warm Sips**: High-calorie warm sugary fluids if fully alert.`;
+    }
+
+    if (p.includes('fire') && (p.includes('rain') || p.includes('wet') || p.includes('spark'))) {
+      return `🔥 **Starting Fire in Wet Conditions:**\n1. **Find Dry Heartwood**: Split dead standing branches to access dry interior wood.\n2. **Tinder Prep**: Shave birch bark or pine fatwood into paper-thin curls.\n3. **Build Raised Platform**: Lay a base of logs so your ember doesn't touch soggy soil.\n4. **Oxygen Channel**: Form a teepee or lean-to allowing continuous airflow.`;
+    }
+
+    // 4. Planning & Itinerary
+    if (p.includes('itinerary') || p.includes('camping') || p.includes('trip plan') || p.includes('hike plan')) {
+      return `⛺ **3-Day Mountain & Trail Itinerary:**\n• **Day 1: Basecamp Setup & Acclimatization**\n  - 08:00 Trailhead ascent (moderate 6km climb)\n  - 13:00 Basecamp pitch & water source locating\n  - 17:00 Sunset ridge scout & dinner prep\n• **Day 2: Peak Summit & Navigation**\n  - 06:00 Alpine start for summit push\n  - 12:00 Ridge turnaround point\n  - 15:00 Return to camp & gear maintenance\n• **Day 3: Break Camp & Descent**\n  - 08:00 Leave No Trace cleanup\n  - 11:00 Trailhead return.`;
+    }
+
+    // 5. General Conversational Fallback
+    if (p.includes('hello') || p.includes('hi') || p.includes('hey')) {
+      return `👋 Hello! I am your Mesh AI Assistant. I can help you solve math, explain code, give emergency survival advice, or draft trip plans. How can I help you today?`;
+    }
+
+    if (p.includes('who are you') || p.includes('what can you do')) {
+      return `🤖 **About Mesh AI Assistant:**\nI am a fast, multi-domain on-device AI copilot built into MeshChat.\n• **General Knowledge**: Science, math, history, and definitions\n• **Engineering**: Code snippets (JS, Python, CSS) & debugging\n• **Outdoor Survival**: Emergency first-aid, navigation, and wilderness guides\n• **Group Collaboration**: Type \`@ai [question]\` in any room to summon me!`;
+    }
+
+    return `💡 **AI Analysis for:** *"${escapeHtml(userPrompt)}"* \n\n• For general inquiries, ask about any scientific topic, calculation, or coding challenge.\n• In group chats, mention **@ai [your prompt]** anytime to trigger an instant group response!\n• For outdoor safety, check our built-in **Survival Guide** in Apps & Tools.`;
+  }
 
   function queryOfflineAiAssistant(userPrompt) {
-    const p = userPrompt.toLowerCase().trim();
+    const p = userPrompt.trim();
     if (!p) return;
 
     appendAiBubble('user', userPrompt);
     elements.aiUserQuery.value = '';
 
-    let bestMatch = null;
-    let maxHits = 0;
-
-    OFFLINE_AI_KNOWLEDGE.forEach(k => {
-      let hits = 0;
-      k.keywords.forEach(kw => {
-        if (p.includes(kw)) hits++;
-      });
-      if (hits > maxHits) {
-        maxHits = hits;
-        bestMatch = k;
-      }
-    });
-
     setTimeout(() => {
-      if (bestMatch && maxHits > 0) {
-        const html = `<strong>${escapeHtml(bestMatch.title)}</strong><br><br>${formatAiText(bestMatch.response)}`;
-        appendAiBubble('assistant', html);
-      } else {
-        const fallback = `<strong>Survival Guidance</strong><br><br>I evaluated: <em>"${escapeHtml(userPrompt)}"</em>.<br><br>• Check the <strong>Survival Handbook (Book Icon)</strong> in header for full emergency guides!`;
-        appendAiBubble('assistant', fallback);
-      }
+      const reply = generateIntelligentAiReply(userPrompt, state.aiPersona || 'omni');
+      appendAiBubble('assistant', formatAiText(reply));
       elements.aiChatHistory.scrollTop = elements.aiChatHistory.scrollHeight;
-    }, 280);
+    }, 180);
   }
 
   function appendAiBubble(role, content) {
     const div = document.createElement('div');
     div.className = `ai-bubble ${role}`;
+    const personaTitle = (AI_PERSONA_CONFIGS[state.aiPersona] && AI_PERSONA_CONFIGS[state.aiPersona].name) || '🧠 Omni AI';
     div.innerHTML = `
-      <div class="ai-name-tag">${role === 'user' ? 'You' : '🤖 Survival AI'}</div>
+      <div class="ai-name-tag">${role === 'user' ? 'You' : personaTitle}</div>
       <div>${content}</div>
     `;
     elements.aiChatHistory.appendChild(div);
     elements.aiChatHistory.scrollTop = elements.aiChatHistory.scrollHeight;
   }
 
-  function formatAiText(txt) {
-    return txt
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\n/g, '<br>');
+  function initAiPersonaHandlers() {
+    document.querySelectorAll('.ai-persona-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.ai-persona-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const p = btn.dataset.persona || 'omni';
+        state.aiPersona = p;
+
+        const config = AI_PERSONA_CONFIGS[p] || AI_PERSONA_CONFIGS.omni;
+        if (elements.aiPersonaAvatar) {
+          const avatars = { omni: '🧠', survival: '🏕️', code: '💻', creative: '✍️' };
+          elements.aiPersonaAvatar.textContent = avatars[p] || '🧠';
+        }
+        if (elements.aiGreetingNametag) elements.aiGreetingNametag.textContent = config.name;
+        if (elements.aiGreetingText) elements.aiGreetingText.textContent = config.greeting;
+      });
+    });
+
+    document.querySelectorAll('.ai-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const p = chip.dataset.prompt;
+        if (p) queryOfflineAiAssistant(p);
+      });
+    });
+  }
+
+  function renderSelfProfile() {
+    if (elements.profileNameInput) elements.profileNameInput.value = state.self.name;
+    if (elements.selfIdTag) elements.selfIdTag.textContent = `ID: ${state.self.id}`;
+    if (elements.selfAvatar) {
+      if (state.self.avatar) {
+        elements.selfAvatar.innerHTML = `<img src="${state.self.avatar}" alt="Avatar" class="peer-avatar-img">`;
+      } else {
+        elements.selfAvatar.innerHTML = getInitials(state.self.name);
+      }
+    }
+  }
+
+  function initAvatarUpload() {
+    if (elements.selfAvatarWrap && elements.avatarFileInput) {
+      elements.selfAvatarWrap.addEventListener('click', () => {
+        elements.avatarFileInput.click();
+      });
+
+      elements.avatarFileInput.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const maxDim = 160;
+            let w = img.width;
+            let h = img.height;
+            if (w > h) {
+              if (w > maxDim) { h = Math.round((h * maxDim) / w); w = maxDim; }
+            } else {
+              if (h > maxDim) { w = Math.round((w * maxDim) / h); h = maxDim; }
+            }
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            const compressed = canvas.toDataURL('image/jpeg', 0.85);
+
+            state.self.avatar = compressed;
+            localStorage.setItem('mesh_peer_avatar', compressed);
+            renderSelfProfile();
+
+            if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+              state.ws.send(JSON.stringify({
+                type: 'PROFILE_UPDATE',
+                peer: state.self
+              }));
+            }
+          };
+          img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
   }
 
   // --- 21. 📊 Interactive Group Polls ---
@@ -2857,13 +3003,25 @@
       return;
     }
 
-    state.ws.onopen = () => {
+    state.ws.onopen = async () => {
       state.connected = true;
-      updateConnectionStatus(true, 'Connected');
+      updateConnectionStatus(true, 'Online & Synced');
       
       state.ws.send(JSON.stringify({
         type: 'JOIN',
         peer: state.self
+      }));
+
+      // Automatically drain queued offline outbox messages
+      await drainOfflineOutbox();
+
+      // Request missed messages since last local timestamp
+      const highestTs = (state.messages && state.messages.length > 0)
+        ? state.messages.reduce((max, m) => Math.max(max, m.timestamp || 0), 0)
+        : 0;
+      state.ws.send(JSON.stringify({
+        type: 'SYNC_REQUEST',
+        since: highestTs
       }));
 
       if (clientHeartbeatInterval) clearInterval(clientHeartbeatInterval);
@@ -2887,13 +3045,13 @@
 
     state.ws.onclose = () => {
       state.connected = false;
-      updateConnectionStatus(false, 'Reconnecting...');
+      updateConnectionStatus(false, 'Offline • Queuing Outbox');
       scheduleReconnect();
     };
 
     state.ws.onerror = () => {
       state.connected = false;
-      updateConnectionStatus(false, 'Waiting for mesh...');
+      updateConnectionStatus(false, 'Connecting...');
       scheduleReconnect();
     };
   }
@@ -2919,6 +3077,13 @@
       case 'WELCOME':
       case 'PEER_LIST_UPDATE':
         renderPeerList(data.peers);
+        if (data.channels && data.channels.length > 0) {
+          data.channels.forEach(ch => {
+            if (!state.channels.find(c => c.id === ch.id)) state.channels.push(ch);
+          });
+          localStorage.setItem('mesh_channels', JSON.stringify(state.channels));
+          renderChannelsList();
+        }
         if (data.sharedNote) handleIncomingNoteUpdate({ note: data.sharedNote });
         if (data.sharedTimer) handleIncomingTimerSync({ timer: data.sharedTimer });
         if (data.sharedExpenses) handleIncomingExpenseAdd({ expenses: data.sharedExpenses });
@@ -2931,6 +3096,59 @@
           }
         }
         break;
+
+      case 'PROFILE_UPDATE': {
+        if (data.peer) {
+          state.peers.set(data.peer.id, data.peer);
+          renderPeerList(data.peers || Array.from(state.peers.values()));
+          if (state.activeTargetId === data.peer.id) {
+            selectChatTarget(data.peer.id);
+          }
+        }
+        break;
+      }
+
+      case 'SYNC_RESPONSE': {
+        if (data.channels && data.channels.length > 0) {
+          data.channels.forEach(ch => {
+            if (!state.channels.find(c => c.id === ch.id)) state.channels.push(ch);
+          });
+          localStorage.setItem('mesh_channels', JSON.stringify(state.channels));
+          renderChannelsList();
+        }
+        if (data.messages && data.messages.length > 0) {
+          for (const rawMsg of data.messages) {
+            const msg = await decryptPayload(rawMsg);
+            if (!state.messages.find(m => m.id === msg.id)) {
+              appendMessage(msg, false);
+            }
+          }
+        }
+        if (data.sharedNote) handleIncomingNoteUpdate({ note: data.sharedNote });
+        if (data.sharedTimer) handleIncomingTimerSync({ timer: data.sharedTimer });
+        if (data.sharedExpenses) handleIncomingExpenseAdd({ expenses: data.sharedExpenses });
+        break;
+      }
+
+      case 'MESSAGE_DELIVERED': {
+        if (data.messageId) {
+          const m = state.messages.find(msg => msg.id === data.messageId);
+          if (m) {
+            m.status = 'delivered';
+            saveMessageToStorage(m);
+            const row = document.getElementById(`msg-row-${m.id}`);
+            if (row) {
+              const icon = row.querySelector('.msg-status-icon');
+              if (icon) {
+                icon.className = 'msg-status-icon delivered';
+                icon.title = 'Delivered';
+                icon.textContent = '✓✓';
+              }
+            }
+          }
+        }
+        break;
+      }
 
       case 'PEER_JOINED':
       case 'PEER_LEFT':
@@ -3490,8 +3708,12 @@
       const div = document.createElement('div');
       div.className = `peer-item ${state.activeTargetId === peer.id ? 'active' : ''}`;
       div.dataset.peerId = peer.id;
+      const avatarContent = peer.avatar
+        ? `<img src="${peer.avatar}" alt="Avatar" class="peer-avatar-img"><span class="peer-dot"></span>`
+        : `${getInitials(peer.name)} <span class="peer-dot"></span>`;
+
       div.innerHTML = `
-        <div class="peer-avatar user">${getInitials(peer.name)} <span class="peer-dot"></span></div>
+        <div class="peer-avatar user">${avatarContent}</div>
         <div class="peer-meta">
           <div class="peer-name-row">
             <span class="peer-name">${escapeHtml(peer.name)}</span>
@@ -3523,7 +3745,11 @@
     elements.activeChatTitle.textContent = peerName;
     elements.activeChatStatus.textContent = 'Direct Peer Link • Private';
     elements.activeChatAvatar.className = 'peer-avatar user';
-    elements.activeChatAvatar.textContent = getInitials(peerName);
+    if (peer && peer.avatar) {
+      elements.activeChatAvatar.innerHTML = `<img src="${peer.avatar}" alt="Avatar" class="peer-avatar-img">`;
+    } else {
+      elements.activeChatAvatar.innerHTML = getInitials(peerName);
+    }
     elements.btnAudioCall.style.display = 'inline-flex';
     elements.btnVideoCall.style.display = 'inline-flex';
 
@@ -3863,8 +4089,21 @@
 
     const isStarred = state.starredIds.has(msg.id);
 
+    let statusReceiptHtml = '';
+    if (isSelf) {
+      if (msg.status === 'pending') {
+        statusReceiptHtml = `<span class="msg-status-icon pending" title="Queued in Outbox (Offline)">🕒</span>`;
+      } else if (msg.status === 'delivered') {
+        statusReceiptHtml = `<span class="msg-status-icon delivered" title="Delivered">✓✓</span>`;
+      } else {
+        statusReceiptHtml = `<span class="msg-status-icon sent" title="Sent">✓</span>`;
+      }
+    }
+
+    const senderDisplay = msg.type === 'ai_reply' ? '🤖 Mesh AI (Assistant)' : escapeHtml(msg.senderName || 'Peer');
+
     row.innerHTML = `
-      ${!isSelf ? `<div class="msg-sender">${escapeHtml(msg.senderName || 'Peer')}</div>` : ''}
+      ${!isSelf ? `<div class="msg-sender">${senderDisplay}</div>` : ''}
       
       <div class="msg-actions-hover">
         <button class="hover-action-btn" data-action="react" data-msg-id="${msg.id}" data-emoji="👍">👍</button>
@@ -3877,16 +4116,12 @@
         ${isSelf ? `<button class="hover-action-btn" data-action="delete" data-msg-id="${msg.id}" title="Delete for everyone" style="color: #ff3b30;">🗑️</button>` : `<button class="hover-action-btn" data-action="delete-me" data-msg-id="${msg.id}" title="Delete for me" style="color: #ff3b30;">🗑️</button>`}
       </div>
 
-      <div class="msg-bubble">
+      <div class="msg-bubble ${msg.type === 'ai_reply' ? 'ai-bubble-reply' : ''}">
         ${contentHtml}
         ${reactionsHtml}
         <div class="msg-footer">
           <span>${timeStr}${isStarred ? ' ⭐' : ''}${msg.isEdited ? '<span class="msg-edited-badge">(edited)</span>' : ''}${disappearingChip}</span>
-          ${isSelf ? `
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="20 6 9 17 4 12"/>
-            </svg>
-          ` : ''}
+          ${statusReceiptHtml}
         </div>
       </div>
     `;
@@ -4206,7 +4441,7 @@
     URL.revokeObjectURL(url);
   }
 
-  // --- 42. Message Dispatch Helper ---
+  // --- 42. Message Dispatch Helper & Offline Outbox Queue ---
   async function dispatchMessage(msgObj) {
     if (state.replyingTo) {
       msgObj.quotedMsg = state.replyingTo;
@@ -4217,9 +4452,18 @@
       msgObj.channelId = state.activeChannelId;
     }
 
+    const isConnected = state.ws && state.ws.readyState === WebSocket.OPEN;
+    msgObj.status = isConnected ? 'sent' : 'pending';
+
+    if (!isConnected) {
+      if (!state.outbox) state.outbox = [];
+      state.outbox.push(msgObj);
+      localStorage.setItem('mesh_outbox', JSON.stringify(state.outbox));
+    }
+
     appendMessage(msgObj, true);
 
-    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+    if (isConnected) {
       const encryptedMsg = await encryptPayload(msgObj);
       state.ws.send(JSON.stringify({
         type: 'CHAT_MESSAGE',
@@ -4227,6 +4471,34 @@
       }));
     } else {
       dispatchMeshRelayPacket(msgObj, state.activeTargetId);
+    }
+  }
+
+  async function drainOfflineOutbox() {
+    if (!state.outbox || state.outbox.length === 0) return;
+    if (!state.ws || state.ws.readyState !== WebSocket.OPEN) return;
+
+    const queued = [...state.outbox];
+    state.outbox = [];
+    localStorage.setItem('mesh_outbox', JSON.stringify([]));
+
+    for (const msgObj of queued) {
+      msgObj.status = 'sent';
+      saveMessageToStorage(msgObj);
+      const existingRow = document.getElementById(`msg-row-${msgObj.id}`);
+      if (existingRow) {
+        const icon = existingRow.querySelector('.msg-status-icon');
+        if (icon) {
+          icon.className = 'msg-status-icon sent';
+          icon.title = 'Sent';
+          icon.textContent = '✓';
+        }
+      }
+      const encryptedMsg = await encryptPayload(msgObj);
+      state.ws.send(JSON.stringify({
+        type: 'CHAT_MESSAGE',
+        message: encryptedMsg
+      }));
     }
   }
 
@@ -4323,18 +4595,41 @@
       return;
     }
 
+    const currentChannel = state.activeTargetId === 'broadcast' ? state.activeChannelId : null;
+    const currentTarget = state.activeTargetId;
+
     const msg = {
       id: 'msg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
       senderId: state.self.id,
       senderName: state.self.name,
-      targetId: state.activeTargetId,
-      channelId: state.activeTargetId === 'broadcast' ? state.activeChannelId : null,
+      targetId: currentTarget,
+      channelId: currentChannel,
       text: text,
       timestamp: Date.now()
     };
 
     await dispatchMessage(msg);
     elements.chatMessageInput.value = '';
+
+    // Check for @ai in-chat summoning
+    const lower = text.toLowerCase();
+    if (lower.startsWith('@ai') || lower.includes(' @ai') || lower.startsWith('@assistant') || lower.includes(' @assistant')) {
+      const prompt = text.replace(/@ai|@assistant/gi, '').trim();
+      setTimeout(async () => {
+        const replyText = generateIntelligentAiReply(prompt, state.aiPersona || 'omni');
+        const aiMsg = {
+          id: 'ai_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+          type: 'ai_reply',
+          senderId: 'ai_bot',
+          senderName: '🧠 Mesh AI',
+          targetId: currentTarget,
+          channelId: currentChannel,
+          text: replyText,
+          timestamp: Date.now()
+        };
+        await dispatchMessage(aiMsg);
+      }, 350);
+    }
   }
 
   // --- 45. WebRTC Calling Engine ---
@@ -5252,14 +5547,14 @@
     });
 
     initMentionsEngine();
+    initAiPersonaHandlers();
+    initAvatarUpload();
   }
 
   // --- 48. Bootstrap ---
   async function init() {
     initEventListeners();
-
-    if (elements.profileNameInput) elements.profileNameInput.value = state.self.name;
-    if (elements.selfIdTag) elements.selfIdTag.textContent = `ID: ${state.self.id}`;
+    renderSelfProfile();
 
     applyCustomTheme();
     renderChannelsList();

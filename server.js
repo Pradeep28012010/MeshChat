@@ -3,6 +3,7 @@ const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
 const os = require('os');
+const fs = require('fs');
 const QRCode = require('qrcode');
 
 const app = express();
@@ -95,10 +96,59 @@ app.get('/api/qr', async (req, res) => {
   }
 });
 
+// Data Persistence Directory
+const DATA_DIR = path.join(__dirname, 'data');
+if (!fs.existsSync(DATA_DIR)) {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+}
+const MESSAGES_FILE = path.join(DATA_DIR, 'messages.json');
+const CHANNELS_FILE = path.join(DATA_DIR, 'channels.json');
+
 // Store connected clients: peerId -> { ws, info: { id, name, avatar, joinedAt, role } }
 const connectedPeers = new Map();
-// Message history in memory for current offline session (persisted on clients via IndexedDB)
+
+// Message history in memory + persistent disk storage
 let sessionMessages = [];
+try {
+  if (fs.existsSync(MESSAGES_FILE)) {
+    sessionMessages = JSON.parse(fs.readFileSync(MESSAGES_FILE, 'utf-8')) || [];
+  }
+} catch (e) {
+  sessionMessages = [];
+}
+
+let serverChannels = [];
+try {
+  if (fs.existsSync(CHANNELS_FILE)) {
+    serverChannels = JSON.parse(fs.readFileSync(CHANNELS_FILE, 'utf-8')) || [];
+  }
+} catch (e) {
+  serverChannels = [];
+}
+
+let saveMsgTimeout = null;
+function saveMessagesToDisk() {
+  clearTimeout(saveMsgTimeout);
+  saveMsgTimeout = setTimeout(() => {
+    try {
+      fs.writeFileSync(MESSAGES_FILE, JSON.stringify(sessionMessages.slice(-500)), 'utf-8');
+    } catch (e) {
+      console.warn('[Storage] Error saving messages to disk:', e);
+    }
+  }, 400);
+}
+
+let saveChanTimeout = null;
+function saveChannelsToDisk() {
+  clearTimeout(saveChanTimeout);
+  saveChanTimeout = setTimeout(() => {
+    try {
+      fs.writeFileSync(CHANNELS_FILE, JSON.stringify(serverChannels), 'utf-8');
+    } catch (e) {
+      console.warn('[Storage] Error saving channels to disk:', e);
+    }
+  }, 400);
+}
 // Real-time collaborative shared notebook / packing checklist
 let activeSharedNote = {
   content: "# 📋 Group Itinerary & Checklist\n\n- [x] Water bottles (2L per person)\n- [x] Portable power banks\n- [ ] First aid & blister kit\n- [ ] Trail maps & compass\n\n*Draft updates sync live across all mesh devices!*",
@@ -168,12 +218,13 @@ wss.on('connection', (ws, req) => {
             }
           });
 
-          // Send welcome acknowledgment + current peer list + recent session messages
+          // Send welcome acknowledgment + current peer list + recent session messages + channels
           ws.send(JSON.stringify({
             type: 'WELCOME',
             peerId: currentPeerId,
             peers: getPeerList(),
-            recentMessages: sessionMessages.slice(-50),
+            channels: serverChannels,
+            recentMessages: sessionMessages.slice(-100),
             serverAddresses: getLocalIPAddresses(),
             sharedNote: activeSharedNote,
             sharedTimer: activeSharedTimer,
@@ -191,6 +242,44 @@ wss.on('connection', (ws, req) => {
           break;
         }
 
+        case 'PROFILE_UPDATE': {
+          if (currentPeerId && connectedPeers.has(currentPeerId)) {
+            const p = connectedPeers.get(currentPeerId);
+            p.info = { ...p.info, ...data.peer };
+            broadcast({
+              type: 'PROFILE_UPDATE',
+              peer: p.info,
+              peers: getPeerList()
+            });
+          }
+          break;
+        }
+
+        case 'SYNC_REQUEST': {
+          const since = data.since || 0;
+          const missed = sessionMessages.filter(m => (m.timestamp || 0) > since);
+          ws.send(JSON.stringify({
+            type: 'SYNC_RESPONSE',
+            messages: missed,
+            channels: serverChannels,
+            sharedNote: activeSharedNote,
+            sharedTimer: activeSharedTimer,
+            sharedExpenses: activeSharedExpenses
+          }));
+          break;
+        }
+
+        case 'MESSAGE_DELIVERED': {
+          if (data.senderId) {
+            sendToPeer(data.senderId, {
+              type: 'MESSAGE_DELIVERED',
+              messageId: data.messageId,
+              deliveredTo: currentPeerId
+            });
+          }
+          break;
+        }
+
         case 'CHAT_MESSAGE': {
           const msg = {
             ...data.message,
@@ -198,9 +287,10 @@ wss.on('connection', (ws, req) => {
             id: data.message.id || 'msg_' + Math.random().toString(36).substr(2, 9)
           };
 
-          // Save to memory cache
+          // Save to persistent storage & memory cache
           sessionMessages.push(msg);
-          if (sessionMessages.length > 200) sessionMessages.shift();
+          if (sessionMessages.length > 500) sessionMessages.shift();
+          saveMessagesToDisk();
 
           if (msg.targetId && msg.targetId !== 'broadcast') {
             // Direct message: send to target and sender
@@ -359,6 +449,10 @@ wss.on('connection', (ws, req) => {
 
         // Custom Sub-Channels Creation & Deletion
         case 'CHANNEL_CREATE': {
+          if (data.channel && !serverChannels.find(c => c.id === data.channel.id)) {
+            serverChannels.push(data.channel);
+            saveChannelsToDisk();
+          }
           broadcast({
             type: 'CHANNEL_CREATE',
             channel: data.channel
@@ -367,6 +461,8 @@ wss.on('connection', (ws, req) => {
         }
 
         case 'CHANNEL_DELETE': {
+          serverChannels = serverChannels.filter(c => c.id !== data.channelId);
+          saveChannelsToDisk();
           broadcast({
             type: 'CHANNEL_DELETE',
             channelId: data.channelId
@@ -377,6 +473,7 @@ wss.on('connection', (ws, req) => {
         case 'CLEAR_ROOM_HISTORY': {
           if (data.channelId) {
             sessionMessages = sessionMessages.filter(m => m.channelId !== data.channelId);
+            saveMessagesToDisk();
           }
           broadcast({
             type: 'CLEAR_ROOM_HISTORY',
