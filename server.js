@@ -368,6 +368,14 @@ wss.on('connection', (ws, req) => {
           break;
         }
 
+        case 'GET_PEERS': {
+          ws.send(JSON.stringify({
+            type: 'PEER_LIST_UPDATE',
+            peers: getPeerList()
+          }));
+          break;
+        }
+
         default:
           console.warn('[MeshHub] Unknown message type:', data.type);
       }

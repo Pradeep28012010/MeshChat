@@ -259,9 +259,12 @@
   }
 
   // --- 4. App State ---
+  const sessionPeerId = sessionStorage.getItem('mesh_tab_id') || ('peer_' + Math.random().toString(36).substr(2, 7));
+  sessionStorage.setItem('mesh_tab_id', sessionPeerId);
+
   const state = {
     self: {
-      id: localStorage.getItem('mesh_peer_id') || 'peer_' + Math.random().toString(36).substr(2, 6),
+      id: sessionPeerId,
       name: localStorage.getItem('mesh_peer_name') || 'User_' + Math.floor(100 + Math.random() * 900)
     },
     theme: localStorage.getItem('mesh_theme') || 'light',
@@ -766,12 +769,25 @@
     `;
   }
 
-  // --- 11. WebSocket Offline Mesh Hub Client ---
+  // --- 11. WebSocket Resilient Mesh Hub Client ---
+  let reconnectTimer = null;
+  let clientHeartbeatInterval = null;
+
   function connectWebSocket() {
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    if (state.ws && (state.ws.readyState === WebSocket.OPEN || state.ws.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${location.host}`;
 
-    state.ws = new WebSocket(wsUrl);
+    try {
+      state.ws = new WebSocket(wsUrl);
+    } catch (e) {
+      scheduleReconnect();
+      return;
+    }
 
     state.ws.onopen = () => {
       state.connected = true;
@@ -781,6 +797,17 @@
         type: 'JOIN',
         peer: state.self
       }));
+
+      // Active client heartbeat & sync every 7 seconds
+      if (clientHeartbeatInterval) clearInterval(clientHeartbeatInterval);
+      clientHeartbeatInterval = setInterval(() => {
+        if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+          state.ws.send(JSON.stringify({ type: 'HEARTBEAT' }));
+          state.ws.send(JSON.stringify({ type: 'GET_PEERS' }));
+        } else {
+          scheduleReconnect();
+        }
+      }, 7000);
     };
 
     state.ws.onmessage = async (event) => {
@@ -794,15 +821,50 @@
 
     state.ws.onclose = () => {
       state.connected = false;
-      updateConnectionStatus(false, 'Waiting for mesh...');
-      setTimeout(connectWebSocket, 3000);
+      updateConnectionStatus(false, 'Reconnecting...');
+      scheduleReconnect();
     };
 
     state.ws.onerror = () => {
       state.connected = false;
-      updateConnectionStatus(false, 'Mesh offline');
+      updateConnectionStatus(false, 'Waiting for mesh...');
+      scheduleReconnect();
     };
   }
+
+  function scheduleReconnect() {
+    if (clientHeartbeatInterval) {
+      clearInterval(clientHeartbeatInterval);
+      clientHeartbeatInterval = null;
+    }
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(() => {
+      connectWebSocket();
+    }, 1500);
+  }
+
+  // Auto-reconnect immediately when user unlocks screen, wakes phone, or focuses tab
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      if (!state.ws || state.ws.readyState !== WebSocket.OPEN) {
+        connectWebSocket();
+      } else {
+        state.ws.send(JSON.stringify({ type: 'GET_PEERS' }));
+      }
+    }
+  });
+
+  window.addEventListener('focus', () => {
+    if (!state.ws || state.ws.readyState !== WebSocket.OPEN) {
+      connectWebSocket();
+    } else {
+      state.ws.send(JSON.stringify({ type: 'GET_PEERS' }));
+    }
+  });
+
+  window.addEventListener('online', () => {
+    connectWebSocket();
+  });
 
   function updateConnectionStatus(isOnline, statusText) {
     if (isOnline) {
@@ -817,8 +879,9 @@
   async function handleIncomingServerMessage(data) {
     switch (data.type) {
       case 'WELCOME':
+      case 'PEER_LIST_UPDATE':
         renderPeerList(data.peers);
-        if (data.recentMessages && data.recentMessages.length > 0) {
+        if (data.type === 'WELCOME' && data.recentMessages && data.recentMessages.length > 0) {
           for (const rawMsg of data.recentMessages) {
             const msg = await decryptPayload(rawMsg);
             if (!state.messages.find(m => m.id === msg.id)) {
