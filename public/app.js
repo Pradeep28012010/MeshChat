@@ -367,6 +367,9 @@
       avatar: localStorage.getItem('mesh_peer_avatar') || null
     },
     outbox: JSON.parse(localStorage.getItem('mesh_outbox') || '[]'),
+    contacts: new Set(JSON.parse(localStorage.getItem('mesh_contacts') || '[]')),
+    pendingRequests: new Set(JSON.parse(localStorage.getItem('mesh_pending_reqs') || '[]')),
+    allNotes: JSON.parse(localStorage.getItem('mesh_all_notes') || '{}'),
     aiPersona: 'omni',
     theme: localStorage.getItem('mesh_theme') || 'light',
     isRedVision: localStorage.getItem('mesh_red_vision') === 'true',
@@ -385,9 +388,9 @@
       { id: 'photos', name: 'photos-media' }
     ],
 
-    // Collaborative Notes
+    // Collaborative Notes (Context-Specific)
     sharedNote: {
-      content: localStorage.getItem('mesh_shared_note') || "# 📋 Group Checklist\n\n- [x] Water & snacks\n- [ ] Power banks\n- [ ] Trail maps",
+      content: "# 📋 Checklist\n\n- [x] Welcome to MeshChat!\n- [ ] Ready to go",
       updatedBy: "System",
       updatedAt: Date.now()
     },
@@ -605,8 +608,32 @@
     notesModalCloseBtn: document.getElementById('notes-modal-close-btn'),
     notesTextarea: document.getElementById('notes-textarea'),
     notesAuthorBadge: document.getElementById('notes-author-badge'),
+    notesSyncStatus: document.getElementById('notes-sync-status'),
     btnBroadcastNotes: document.getElementById('btn-broadcast-notes'),
     btnClearNotes: document.getElementById('btn-clear-notes'),
+
+    // 3D Dice & RPS Showdown & Context Menu
+    diceModalOverlay: document.getElementById('dice-modal-overlay'),
+    diceModalCloseBtn: document.getElementById('dice-modal-close-btn'),
+    dice3dCube: document.getElementById('dice-3d-cube'),
+    diceResultText: document.getElementById('dice-result-text'),
+    btnRoll3dDice: document.getElementById('btn-roll-3d-dice'),
+    btnShareDiceResult: document.getElementById('btn-share-dice-result'),
+
+    rpsModalOverlay: document.getElementById('rps-modal-overlay'),
+    rpsModalCloseBtn: document.getElementById('rps-modal-close-btn'),
+    rpsSelfHand: document.getElementById('rps-self-hand'),
+    rpsPeerHand: document.getElementById('rps-peer-hand'),
+    rpsStatusBadge: document.getElementById('rps-status-badge'),
+    rpsResultText: document.getElementById('rps-result-text'),
+
+    contactRequestToast: document.getElementById('contact-request-toast'),
+    contactReqAvatar: document.getElementById('contact-req-avatar'),
+    contactReqName: document.getElementById('contact-req-name'),
+    btnAcceptContactReq: document.getElementById('btn-accept-contact-req'),
+    btnDeclineContactReq: document.getElementById('btn-decline-contact-req'),
+
+    appContextMenu: document.getElementById('app-context-menu'),
 
     // Network Telemetry HUD
     btnOpenNetwork: document.getElementById('btn-open-network'),
@@ -1168,26 +1195,55 @@
     });
   }
 
-  // --- 10. 📋 Collaborative Sync Notes Engine ---
+  // --- 10. 📋 Collaborative Sync Notes Engine (Per-Room & Per-DM Isolated) ---
+  function getActiveContextId() {
+    if (state.activeTargetId === 'broadcast') {
+      return 'room_' + (state.activeChannelId || 'general');
+    }
+    return 'dm_' + [state.self.id, state.activeTargetId].sort().join('___');
+  }
+
   function openNotesModal() {
-    elements.notesTextarea.value = state.sharedNote.content || '';
-    elements.notesAuthorBadge.textContent = `Last edit: ${state.sharedNote.updatedBy} (${formatTime(state.sharedNote.updatedAt)})`;
+    const contextId = getActiveContextId();
+    const targetLabel = state.activeTargetId === 'broadcast'
+      ? `#${state.activeChannelId || 'general'}`
+      : (state.peers.get(state.activeTargetId)?.name || 'Direct Peer');
+
+    if (elements.notesSyncStatus) {
+      elements.notesSyncStatus.textContent = `Notes for ${targetLabel} • Auto-saved & synced`;
+    }
+
+    if (!state.allNotes) state.allNotes = {};
+    const note = state.allNotes[contextId];
+
+    if (note && note.content !== undefined) {
+      elements.notesTextarea.value = note.content;
+      elements.notesAuthorBadge.textContent = `Last edit: ${note.updatedBy || 'You'} (${formatTime(note.updatedAt || Date.now())})`;
+    } else {
+      const defaultText = `# 📋 Notes for ${targetLabel}\n\n- [ ] Checklist item 1\n- [ ] Checklist item 2`;
+      elements.notesTextarea.value = defaultText;
+      elements.notesAuthorBadge.textContent = `Last edit: You`;
+    }
     elements.notesModalOverlay.classList.add('active');
   }
 
   function broadcastNotesUpdate() {
+    const contextId = getActiveContextId();
     const text = elements.notesTextarea.value;
-    state.sharedNote = {
+    if (!state.allNotes) state.allNotes = {};
+    state.allNotes[contextId] = {
+      contextId,
       content: text,
       updatedBy: state.self.name,
       updatedAt: Date.now()
     };
-    localStorage.setItem('mesh_shared_note', text);
+    localStorage.setItem('mesh_all_notes', JSON.stringify(state.allNotes));
     elements.notesAuthorBadge.textContent = `Last edit: You (Just now)`;
 
     if (state.ws && state.ws.readyState === WebSocket.OPEN) {
       state.ws.send(JSON.stringify({
         type: 'NOTE_UPDATE',
+        contextId: contextId,
         noteContent: text,
         updatedBy: state.self.name
       }));
@@ -1195,13 +1251,17 @@
   }
 
   function handleIncomingNoteUpdate(data) {
-    if (data.note) {
-      state.sharedNote = data.note;
-      localStorage.setItem('mesh_shared_note', data.note.content);
-      if (elements.notesModalOverlay.classList.contains('active')) {
+    if (data.contextId && data.note) {
+      if (!state.allNotes) state.allNotes = {};
+      state.allNotes[data.contextId] = data.note;
+      localStorage.setItem('mesh_all_notes', JSON.stringify(state.allNotes));
+
+      if (elements.notesModalOverlay.classList.contains('active') && getActiveContextId() === data.contextId) {
         elements.notesTextarea.value = data.note.content;
         elements.notesAuthorBadge.textContent = `Last edit: ${data.note.updatedBy} (${formatTime(data.note.updatedAt)})`;
       }
+    } else if (data.note) {
+      state.sharedNote = data.note;
     }
   }
 
@@ -1623,48 +1683,298 @@
     await dispatchMessage(gameMsg);
   }
 
-  async function rollDiceGame() {
-    elements.gamesModalOverlay.classList.remove('active');
-    const d1 = Math.floor(Math.random() * 6) + 1;
-    const d2 = Math.floor(Math.random() * 6) + 1;
-    const diceFaces = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+  // --- 16. 🎲 3D Physics Dice Roller & ⚔️ RPS Showdown ---
+  let currentDiceOutcome = 6;
+  const DICE_ROTATIONS = {
+    1: 'rotateY(0deg) rotateX(0deg)',
+    2: 'rotateY(-90deg) rotateX(0deg)',
+    3: 'rotateY(-180deg) rotateX(0deg)',
+    4: 'rotateY(90deg) rotateX(0deg)',
+    5: 'rotateX(-90deg) rotateY(0deg)',
+    6: 'rotateX(90deg) rotateY(0deg)'
+  };
 
-    const gameMsg = {
-      id: 'game_dice_' + Date.now(),
-      type: 'diceroll',
-      senderId: state.self.id,
-      senderName: state.self.name,
-      targetId: state.activeTargetId,
-      channelId: state.activeTargetId === 'broadcast' ? state.activeChannelId : null,
-      die1: d1,
-      die2: d2,
-      die1Face: diceFaces[d1 - 1],
-      die2Face: diceFaces[d2 - 1],
-      total: d1 + d2,
-      timestamp: Date.now()
-    };
-
-    playSound('game_move');
-    await dispatchMessage(gameMsg);
+  function init3dDiceRoller() {
+    if (elements.btnRoll3dDice) {
+      elements.btnRoll3dDice.addEventListener('click', roll3dDice);
+    }
+    if (elements.btnShareDiceResult) {
+      elements.btnShareDiceResult.addEventListener('click', shareDiceResultToChat);
+    }
+    if (elements.btnStartDiceroll) {
+      elements.btnStartDiceroll.addEventListener('click', () => {
+        elements.gamesModalOverlay.classList.remove('active');
+        elements.diceModalOverlay.classList.add('active');
+      });
+    }
+    if (elements.diceModalCloseBtn) {
+      elements.diceModalCloseBtn.addEventListener('click', () => {
+        elements.diceModalOverlay.classList.remove('active');
+      });
+    }
   }
 
-  async function playRpsGame() {
-    elements.gamesModalOverlay.classList.remove('active');
-    const choices = ['✊ Rock', '✋ Paper', '✌️ Scissors'];
-    const pick = choices[Math.floor(Math.random() * choices.length)];
+  function roll3dDice() {
+    if (!elements.dice3dCube) return;
+    elements.dice3dCube.classList.add('rolling');
+    elements.diceResultText.textContent = 'Rolling 3D Dice... 🎲';
+    playSound('game_move');
+    if ('vibrate' in navigator) navigator.vibrate([40, 30, 40]);
 
+    setTimeout(() => {
+      elements.dice3dCube.classList.remove('rolling');
+      const rolled = Math.floor(Math.random() * 6) + 1;
+      currentDiceOutcome = rolled;
+      const rot = DICE_ROTATIONS[rolled];
+      elements.dice3dCube.style.transform = `${rot} rotateZ(${Math.floor(Math.random() * 4) * 90}deg)`;
+      elements.diceResultText.textContent = `🎉 You Rolled: ${rolled}!`;
+      playSound('message_received');
+      if ('vibrate' in navigator) navigator.vibrate(100);
+    }, 700);
+  }
+
+  async function shareDiceResultToChat() {
+    elements.diceModalOverlay.classList.remove('active');
     const msg = {
-      id: 'msg_rps_' + Date.now(),
+      id: 'game_dice_' + Date.now(),
       senderId: state.self.id,
       senderName: state.self.name,
       targetId: state.activeTargetId,
       channelId: state.activeTargetId === 'broadcast' ? state.activeChannelId : null,
-      text: `🎮 Rock-Paper-Scissors Shoot! ➜ **${pick}**`,
+      text: `🎲 **Dice Roll Duel:** ${state.self.name} threw a **${currentDiceOutcome}**! Can you beat it?`,
       timestamp: Date.now()
     };
-
-    playSound('game_move');
     await dispatchMessage(msg);
+  }
+
+  // ⚔️ 2-Player Rock Paper Scissors Showdown
+  function initRpsShowdown() {
+    if (elements.btnStartRps) {
+      elements.btnStartRps.addEventListener('click', () => {
+        elements.gamesModalOverlay.classList.remove('active');
+        elements.rpsResultText.textContent = 'Pick your move to start!';
+        elements.rpsSelfHand.textContent = '✊';
+        elements.rpsPeerHand.textContent = '✊';
+        elements.rpsModalOverlay.classList.add('active');
+      });
+    }
+    if (elements.rpsModalCloseBtn) {
+      elements.rpsModalCloseBtn.addEventListener('click', () => {
+        elements.rpsModalOverlay.classList.remove('active');
+      });
+    }
+
+    document.querySelectorAll('.rps-choice-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const choice = btn.dataset.choice;
+        playRpsRound(choice);
+      });
+    });
+  }
+
+  function playRpsRound(myChoice) {
+    const handEmojis = { rock: '🪨', paper: '📄', scissors: '✂️' };
+    elements.rpsSelfHand.classList.add('shaking');
+    elements.rpsPeerHand.classList.add('shaking');
+    elements.rpsResultText.textContent = '3... 2... 1... Showdown!';
+    playSound('game_move');
+    if ('vibrate' in navigator) navigator.vibrate([50, 50, 50]);
+
+    setTimeout(async () => {
+      elements.rpsSelfHand.classList.remove('shaking');
+      elements.rpsPeerHand.classList.remove('shaking');
+
+      const choices = ['rock', 'paper', 'scissors'];
+      const opponentChoice = choices[Math.floor(Math.random() * 3)];
+
+      elements.rpsSelfHand.textContent = handEmojis[myChoice];
+      elements.rpsPeerHand.textContent = handEmojis[opponentChoice];
+
+      let outcome = '';
+      if (myChoice === opponentChoice) {
+        outcome = "🤝 It's a Tie / Draw!";
+      } else if (
+        (myChoice === 'rock' && opponentChoice === 'scissors') ||
+        (myChoice === 'paper' && opponentChoice === 'rock') ||
+        (myChoice === 'scissors' && opponentChoice === 'paper')
+      ) {
+        outcome = '🏆 YOU WIN!';
+      } else {
+        outcome = '💥 Opponent Wins!';
+      }
+
+      elements.rpsResultText.textContent = `${outcome} (${myChoice} vs ${opponentChoice})`;
+      playSound('message_received');
+      if ('vibrate' in navigator) navigator.vibrate(120);
+
+      // Post result to active room
+      const msg = {
+        id: 'game_rps_' + Date.now(),
+        senderId: state.self.id,
+        senderName: state.self.name,
+        targetId: state.activeTargetId,
+        channelId: state.activeTargetId === 'broadcast' ? state.activeChannelId : null,
+        text: `⚔️ **RPS Duel:** ${state.self.name} picked ${handEmojis[myChoice]} vs ${handEmojis[opponentChoice]} ➜ **${outcome}**`,
+        timestamp: Date.now()
+      };
+      await dispatchMessage(msg);
+    }, 900);
+  }
+
+  // --- 17. 🖱️ Universal App Context Menu (Desktop Right-Click & Mobile Long-Press) ---
+  let activeContextMessageId = null;
+  function initContextMenu() {
+    const menu = elements.appContextMenu;
+    if (!menu) return;
+
+    if (elements.messagesContainer) {
+      elements.messagesContainer.addEventListener('contextmenu', (e) => {
+        const msgRow = e.target.closest('.msg-row');
+        if (!msgRow) return;
+        e.preventDefault();
+        openContextMenuForMessage(msgRow.dataset.msgId, e.clientX, e.clientY);
+      });
+
+      // Mobile Long-Press Support (500ms touch timer)
+      let touchTimer = null;
+      elements.messagesContainer.addEventListener('touchstart', (e) => {
+        const msgRow = e.target.closest('.msg-row');
+        if (!msgRow) return;
+        const touch = e.touches[0];
+        touchTimer = setTimeout(() => {
+          openContextMenuForMessage(msgRow.dataset.msgId, touch.clientX, touch.clientY);
+          if ('vibrate' in navigator) navigator.vibrate(50);
+        }, 500);
+      }, { passive: true });
+
+      elements.messagesContainer.addEventListener('touchend', () => {
+        if (touchTimer) clearTimeout(touchTimer);
+      });
+      elements.messagesContainer.addEventListener('touchmove', () => {
+        if (touchTimer) clearTimeout(touchTimer);
+      });
+    }
+
+    document.addEventListener('click', (e) => {
+      if (menu && !menu.contains(e.target)) {
+        menu.style.display = 'none';
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && menu) menu.style.display = 'none';
+    });
+
+    menu.querySelectorAll('.ctx-react-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (activeContextMessageId) {
+          sendReaction(activeContextMessageId, btn.dataset.emoji);
+        }
+        menu.style.display = 'none';
+      });
+    });
+
+    const btnReply = document.getElementById('ctx-action-reply');
+    if (btnReply) {
+      btnReply.addEventListener('click', () => {
+        if (activeContextMessageId) {
+          const msg = state.messages.find(m => m.id === activeContextMessageId);
+          if (msg) startReply(msg);
+        }
+        menu.style.display = 'none';
+      });
+    }
+
+    const btnEdit = document.getElementById('ctx-action-edit');
+    if (btnEdit) {
+      btnEdit.addEventListener('click', () => {
+        if (activeContextMessageId) {
+          startEditingMessage(activeContextMessageId);
+        }
+        menu.style.display = 'none';
+      });
+    }
+
+    const btnPin = document.getElementById('ctx-action-pin');
+    if (btnPin) {
+      btnPin.addEventListener('click', () => {
+        if (activeContextMessageId) {
+          pinMessage(activeContextMessageId);
+        }
+        menu.style.display = 'none';
+      });
+    }
+
+    const btnStar = document.getElementById('ctx-action-star');
+    if (btnStar) {
+      btnStar.addEventListener('click', () => {
+        if (activeContextMessageId) {
+          toggleStarMessage(activeContextMessageId);
+        }
+        menu.style.display = 'none';
+      });
+    }
+
+    const btnCopy = document.getElementById('ctx-action-copy');
+    if (btnCopy) {
+      btnCopy.addEventListener('click', () => {
+        if (activeContextMessageId) {
+          const msg = state.messages.find(m => m.id === activeContextMessageId);
+          if (msg && msg.text) {
+            navigator.clipboard.writeText(msg.text);
+          }
+        }
+        menu.style.display = 'none';
+      });
+    }
+
+    const btnDelEveryone = document.getElementById('ctx-action-delete-everyone');
+    if (btnDelEveryone) {
+      btnDelEveryone.addEventListener('click', () => {
+        if (activeContextMessageId) {
+          deleteMessageForEveryone(activeContextMessageId);
+        }
+        menu.style.display = 'none';
+      });
+    }
+
+    const btnDelMe = document.getElementById('ctx-action-delete-me');
+    if (btnDelMe) {
+      btnDelMe.addEventListener('click', () => {
+        if (activeContextMessageId) {
+          deleteMessageForMe(activeContextMessageId);
+        }
+        menu.style.display = 'none';
+      });
+    }
+  }
+
+  function openContextMenuForMessage(msgId, x, y) {
+    const msg = state.messages.find(m => m.id === msgId);
+    if (!msg) return;
+    activeContextMessageId = msgId;
+    const isSelf = msg.senderId === state.self.id;
+    const isStarred = state.starredIds.has(msgId);
+
+    const btnEdit = document.getElementById('ctx-action-edit');
+    if (btnEdit) btnEdit.style.display = (isSelf && msg.text) ? 'flex' : 'none';
+
+    const btnDelEveryone = document.getElementById('ctx-action-delete-everyone');
+    if (btnDelEveryone) btnDelEveryone.style.display = isSelf ? 'flex' : 'none';
+
+    const starLabel = document.getElementById('ctx-star-label');
+    if (starLabel) starLabel.textContent = isStarred ? 'Unstar Message' : 'Star Message';
+
+    const menu = elements.appContextMenu;
+    menu.style.display = 'block';
+
+    const menuWidth = 210;
+    const menuHeight = 260;
+    const posX = Math.min(x, window.innerWidth - menuWidth - 12);
+    const posY = Math.min(y, window.innerHeight - menuHeight - 12);
+
+    menu.style.left = `${Math.max(12, posX)}px`;
+    menu.style.top = `${Math.max(12, posY)}px`;
   }
 
   function handleTttCellClick(gameId, cellIndex) {
@@ -3076,6 +3386,10 @@
     switch (data.type) {
       case 'WELCOME':
       case 'PEER_LIST_UPDATE':
+        if (data.acceptedContacts && data.acceptedContacts.length > 0) {
+          data.acceptedContacts.forEach(c => state.contacts.add(c));
+          localStorage.setItem('mesh_contacts', JSON.stringify(Array.from(state.contacts)));
+        }
         renderPeerList(data.peers);
         if (data.channels && data.channels.length > 0) {
           data.channels.forEach(ch => {
@@ -3083,6 +3397,10 @@
           });
           localStorage.setItem('mesh_channels', JSON.stringify(state.channels));
           renderChannelsList();
+        }
+        if (data.allNotes) {
+          Object.assign(state.allNotes, data.allNotes);
+          localStorage.setItem('mesh_all_notes', JSON.stringify(state.allNotes));
         }
         if (data.sharedNote) handleIncomingNoteUpdate({ note: data.sharedNote });
         if (data.sharedTimer) handleIncomingTimerSync({ timer: data.sharedTimer });
@@ -3094,6 +3412,29 @@
               appendMessage(msg, false);
             }
           }
+        }
+        break;
+
+      case 'CONTACT_REQUEST':
+        handleIncomingContactRequest(data);
+        break;
+
+      case 'CONTACT_ACCEPTED':
+        if (data.peer) {
+          state.contacts.add(data.peer.id);
+          state.contacts.add(getPairKey(state.self.id, data.peer.id));
+          state.pendingRequests.delete(data.peer.id);
+          localStorage.setItem('mesh_contacts', JSON.stringify(Array.from(state.contacts)));
+          localStorage.setItem('mesh_pending_reqs', JSON.stringify(Array.from(state.pendingRequests)));
+          renderPeerList(Array.from(state.peers.values()));
+        }
+        break;
+
+      case 'CONTACT_DECLINED':
+        if (data.fromPeerId) {
+          state.pendingRequests.delete(data.fromPeerId);
+          localStorage.setItem('mesh_pending_reqs', JSON.stringify(Array.from(state.pendingRequests)));
+          renderPeerList(Array.from(state.peers.values()));
         }
         break;
 
@@ -3109,12 +3450,20 @@
       }
 
       case 'SYNC_RESPONSE': {
+        if (data.acceptedContacts && data.acceptedContacts.length > 0) {
+          data.acceptedContacts.forEach(c => state.contacts.add(c));
+          localStorage.setItem('mesh_contacts', JSON.stringify(Array.from(state.contacts)));
+        }
         if (data.channels && data.channels.length > 0) {
           data.channels.forEach(ch => {
             if (!state.channels.find(c => c.id === ch.id)) state.channels.push(ch);
           });
           localStorage.setItem('mesh_channels', JSON.stringify(state.channels));
           renderChannelsList();
+        }
+        if (data.allNotes) {
+          Object.assign(state.allNotes, data.allNotes);
+          localStorage.setItem('mesh_all_notes', JSON.stringify(state.allNotes));
         }
         if (data.messages && data.messages.length > 0) {
           for (const rawMsg of data.messages) {
@@ -3691,6 +4040,10 @@
     return name.slice(0, 2).toUpperCase();
   }
 
+  function getPairKey(a, b) {
+    return [a, b].sort().join(':::');
+  }
+
   function renderPeerList(peerArray = []) {
     state.peers.clear();
     const activeCount = peerArray.length;
@@ -3704,6 +4057,18 @@
 
       const bat = state.peerBatteries.get(peer.id);
       const batHtml = bat ? `<span class="peer-battery-badge ${bat.level <= 20 ? 'low' : ''}">🔋 ${bat.level}%</span>` : '';
+
+      const isConnected = state.contacts.has(peer.id) || state.contacts.has(getPairKey(state.self.id, peer.id));
+      const isPending = state.pendingRequests.has(peer.id);
+
+      let actionHtml = '';
+      if (isConnected) {
+        actionHtml = `<div class="peer-sub" style="color: #34c759; font-weight: 500;">✓ Connected</div>`;
+      } else if (isPending) {
+        actionHtml = `<div><button class="btn-request-contact pending">⏳ Requested</button></div>`;
+      } else {
+        actionHtml = `<div><button class="btn-request-contact" data-peer-id="${peer.id}">➕ Connect</button></div>`;
+      }
 
       const div = document.createElement('div');
       div.className = `peer-item ${state.activeTargetId === peer.id ? 'active' : ''}`;
@@ -3719,15 +4084,91 @@
             <span class="peer-name">${escapeHtml(peer.name)}</span>
             ${batHtml}
           </div>
-          <div class="peer-sub">Direct Channel</div>
+          ${actionHtml}
         </div>
       `;
 
-      div.addEventListener('click', () => selectChatTarget(peer.id));
+      const connectBtn = div.querySelector('.btn-request-contact:not(.pending)');
+      if (connectBtn) {
+        connectBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          sendContactRequest(peer.id);
+        });
+      }
+
+      div.addEventListener('click', () => {
+        if (!isConnected) {
+          sendContactRequest(peer.id);
+        } else {
+          selectChatTarget(peer.id);
+        }
+      });
       elements.peerList.appendChild(div);
     });
 
     updateCompassDisplay();
+  }
+
+  function sendContactRequest(targetId) {
+    state.pendingRequests.add(targetId);
+    localStorage.setItem('mesh_pending_reqs', JSON.stringify(Array.from(state.pendingRequests)));
+    renderPeerList(Array.from(state.peers.values()));
+
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+      state.ws.send(JSON.stringify({
+        type: 'CONTACT_REQUEST',
+        targetId: targetId
+      }));
+    }
+  }
+
+  let activeIncomingRequester = null;
+  function handleIncomingContactRequest(data) {
+    if (!data.fromPeer) return;
+    activeIncomingRequester = data.fromPeer;
+
+    if (elements.contactRequestToast) {
+      if (elements.contactReqAvatar) {
+        if (data.fromPeer.avatar) {
+          elements.contactReqAvatar.innerHTML = `<img src="${data.fromPeer.avatar}" alt="Avatar" class="peer-avatar-img">`;
+        } else {
+          elements.contactReqAvatar.textContent = getInitials(data.fromPeer.name);
+        }
+      }
+      if (elements.contactReqName) elements.contactReqName.textContent = data.fromPeer.name;
+      elements.contactRequestToast.style.display = 'flex';
+    }
+  }
+
+  function acceptContactRequest() {
+    if (!activeIncomingRequester) return;
+    const peerId = activeIncomingRequester.id;
+    state.contacts.add(peerId);
+    state.contacts.add(getPairKey(state.self.id, peerId));
+    localStorage.setItem('mesh_contacts', JSON.stringify(Array.from(state.contacts)));
+
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+      state.ws.send(JSON.stringify({
+        type: 'CONTACT_ACCEPT',
+        targetId: peerId
+      }));
+    }
+
+    if (elements.contactRequestToast) elements.contactRequestToast.style.display = 'none';
+    renderPeerList(Array.from(state.peers.values()));
+    selectChatTarget(peerId);
+  }
+
+  function declineContactRequest() {
+    if (!activeIncomingRequester) return;
+    const peerId = activeIncomingRequester.id;
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+      state.ws.send(JSON.stringify({
+        type: 'CONTACT_DECLINE',
+        targetId: peerId
+      }));
+    }
+    if (elements.contactRequestToast) elements.contactRequestToast.style.display = 'none';
   }
 
   function selectChatTarget(targetId) {
@@ -3917,19 +4358,21 @@
         const hasVoted = opt.voters && opt.voters.includes(state.self.id);
 
         optionsHtml += `
-          <div class="poll-opt-row ${hasVoted ? 'voted' : ''}" data-poll-id="${msg.id}" data-opt-idx="${idx}">
-            <div class="poll-opt-fill" style="width: ${percent}%;"></div>
-            <span class="poll-opt-text">${hasVoted ? '✓ ' : ''}${escapeHtml(opt.text)}</span>
-            <span class="poll-opt-votes">${votes} (${percent}%)</span>
+          <div class="poll-opt-row ${hasVoted ? 'voted-by-me' : ''}" data-poll-id="${msg.id}" data-opt-idx="${idx}">
+            <div class="poll-opt-progress-bar" style="width: ${percent}%;"></div>
+            <div class="poll-opt-content">
+              <span>${hasVoted ? '✓ ' : ''}${escapeHtml(opt.text)}</span>
+            </div>
+            <div class="poll-opt-percent">${votes} (${percent}%)</div>
           </div>
         `;
       });
 
       contentHtml += `
-        <div class="poll-card">
-          <div class="poll-question">📊 ${escapeHtml(msg.question)}</div>
+        <div class="poll-bubble-card">
+          <div class="poll-question-title">📊 ${escapeHtml(msg.question)}</div>
           <div class="poll-options-list">${optionsHtml}</div>
-          <div class="poll-footer-info">${totalVotes} total votes • Tap option to vote</div>
+          <div class="poll-total-votes">${totalVotes} total votes • Tap any option to vote</div>
         </div>
       `;
     }
@@ -5207,12 +5650,17 @@
     if (elements.eventModalCloseBtn) elements.eventModalCloseBtn.addEventListener('click', () => elements.eventModalOverlay.classList.remove('active'));
     if (elements.btnSubmitCreateEvent) elements.btnSubmitCreateEvent.addEventListener('click', submitCreateEvent);
 
-    // Games Hub
+    // Games Hub & 3D Dice & RPS Showdown
     if (elements.btnOpenGames) elements.btnOpenGames.addEventListener('click', () => elements.gamesModalOverlay.classList.add('active'));
     if (elements.gamesModalCloseBtn) elements.gamesModalCloseBtn.addEventListener('click', () => elements.gamesModalOverlay.classList.remove('active'));
     if (elements.btnStartTictactoe) elements.btnStartTictactoe.addEventListener('click', startTicTacToeGame);
-    if (elements.btnStartDiceroll) elements.btnStartDiceroll.addEventListener('click', rollDiceGame);
-    if (elements.btnStartRps) elements.btnStartRps.addEventListener('click', playRpsGame);
+    init3dDiceRoller();
+    initRpsShowdown();
+    initContextMenu();
+
+    // Instagram-Style Contact Request Actions
+    if (elements.btnAcceptContactReq) elements.btnAcceptContactReq.addEventListener('click', acceptContactRequest);
+    if (elements.btnDeclineContactReq) elements.btnDeclineContactReq.addEventListener('click', declineContactRequest);
 
     // Quick Templates
     if (elements.btnQuickTemplates) elements.btnQuickTemplates.addEventListener('click', () => elements.templatesModalOverlay.classList.add('active'));

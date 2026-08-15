@@ -103,6 +103,8 @@ if (!fs.existsSync(DATA_DIR)) {
 }
 const MESSAGES_FILE = path.join(DATA_DIR, 'messages.json');
 const CHANNELS_FILE = path.join(DATA_DIR, 'channels.json');
+const NOTES_FILE = path.join(DATA_DIR, 'notes.json');
+const CONTACTS_FILE = path.join(DATA_DIR, 'contacts.json');
 
 // Store connected clients: peerId -> { ws, info: { id, name, avatar, joinedAt, role } }
 const connectedPeers = new Map();
@@ -124,6 +126,38 @@ try {
   }
 } catch (e) {
   serverChannels = [];
+}
+
+// Per-Room & Per-DM isolated shared notes
+let activeSharedNotes = {
+  'room_general': {
+    contextId: 'room_general',
+    content: "# 📋 #general Notes & Checklist\n\n- [x] Welcome to MeshChat!\n- [ ] Plan meetup\n- [ ] Share route",
+    updatedBy: "System",
+    updatedAt: Date.now()
+  }
+};
+try {
+  if (fs.existsSync(NOTES_FILE)) {
+    activeSharedNotes = JSON.parse(fs.readFileSync(NOTES_FILE, 'utf-8')) || activeSharedNotes;
+  }
+} catch (e) {
+  activeSharedNotes = {};
+}
+
+// Instagram-style approved contact pairs (e.g. "peerA:::peerB")
+let acceptedContactPairs = new Set();
+try {
+  if (fs.existsSync(CONTACTS_FILE)) {
+    const list = JSON.parse(fs.readFileSync(CONTACTS_FILE, 'utf-8')) || [];
+    list.forEach(k => acceptedContactPairs.add(k));
+  }
+} catch (e) {
+  acceptedContactPairs = new Set();
+}
+
+function getPairKey(a, b) {
+  return [a, b].sort().join(':::');
 }
 
 let saveMsgTimeout = null;
@@ -149,12 +183,26 @@ function saveChannelsToDisk() {
     }
   }, 400);
 }
-// Real-time collaborative shared notebook / packing checklist
-let activeSharedNote = {
-  content: "# 📋 Group Itinerary & Checklist\n\n- [x] Water bottles (2L per person)\n- [x] Portable power banks\n- [ ] First aid & blister kit\n- [ ] Trail maps & compass\n\n*Draft updates sync live across all mesh devices!*",
-  updatedBy: "System",
-  updatedAt: Date.now()
-};
+
+let saveNotesTimeout = null;
+function saveNotesToDisk() {
+  clearTimeout(saveNotesTimeout);
+  saveNotesTimeout = setTimeout(() => {
+    try {
+      fs.writeFileSync(NOTES_FILE, JSON.stringify(activeSharedNotes), 'utf-8');
+    } catch (e) {
+      console.warn('[Storage] Error saving notes to disk:', e);
+    }
+  }, 400);
+}
+
+function saveContactsToDisk() {
+  try {
+    fs.writeFileSync(CONTACTS_FILE, JSON.stringify(Array.from(acceptedContactPairs)), 'utf-8');
+  } catch (e) {
+    console.warn('[Storage] Error saving contacts to disk:', e);
+  }
+}
 
 // Synchronized Group Timer / Rendezvous Countdown
 let activeSharedTimer = {
@@ -218,7 +266,7 @@ wss.on('connection', (ws, req) => {
             }
           });
 
-          // Send welcome acknowledgment + current peer list + recent session messages + channels
+          // Send welcome acknowledgment + current peer list + recent session messages + channels + allNotes + contacts
           ws.send(JSON.stringify({
             type: 'WELCOME',
             peerId: currentPeerId,
@@ -226,7 +274,8 @@ wss.on('connection', (ws, req) => {
             channels: serverChannels,
             recentMessages: sessionMessages.slice(-100),
             serverAddresses: getLocalIPAddresses(),
-            sharedNote: activeSharedNote,
+            allNotes: activeSharedNotes,
+            acceptedContacts: Array.from(acceptedContactPairs),
             sharedTimer: activeSharedTimer,
             sharedExpenses: activeSharedExpenses
           }));
@@ -262,7 +311,8 @@ wss.on('connection', (ws, req) => {
             type: 'SYNC_RESPONSE',
             messages: missed,
             channels: serverChannels,
-            sharedNote: activeSharedNote,
+            allNotes: activeSharedNotes,
+            acceptedContacts: Array.from(acceptedContactPairs),
             sharedTimer: activeSharedTimer,
             sharedExpenses: activeSharedExpenses
           }));
@@ -373,6 +423,20 @@ wss.on('connection', (ws, req) => {
 
         // Live Polls & Group Voting
         case 'POLL_VOTE': {
+          const pollMsg = sessionMessages.find(m => m.id === data.pollId);
+          if (pollMsg && pollMsg.options) {
+            pollMsg.options.forEach((opt, idx) => {
+              if (!opt.voters) opt.voters = [];
+              const uIdx = opt.voters.indexOf(currentPeerId);
+              if (idx === data.optionIndex) {
+                if (uIdx === -1) opt.voters.push(currentPeerId);
+              } else {
+                if (uIdx !== -1) opt.voters.splice(uIdx, 1);
+              }
+            });
+            saveMessagesToDisk();
+          }
+
           broadcast({
             type: 'POLL_VOTE',
             pollId: data.pollId,
@@ -383,11 +447,57 @@ wss.on('connection', (ws, req) => {
           break;
         }
 
+        // Instagram-style Privacy: Contact Request, Accept, Decline
+        case 'CONTACT_REQUEST': {
+          if (data.targetId) {
+            sendToPeer(data.targetId, {
+              type: 'CONTACT_REQUEST',
+              fromPeer: connectedPeers.get(currentPeerId)?.info || { id: currentPeerId, name: 'Peer' }
+            });
+          }
+          break;
+        }
+
+        case 'CONTACT_ACCEPT': {
+          if (data.targetId) {
+            const pairKey = getPairKey(currentPeerId, data.targetId);
+            acceptedContactPairs.add(pairKey);
+            saveContactsToDisk();
+
+            const myInfo = connectedPeers.get(currentPeerId)?.info;
+            const targetInfo = connectedPeers.get(data.targetId)?.info;
+
+            sendToPeer(data.targetId, {
+              type: 'CONTACT_ACCEPTED',
+              peer: myInfo
+            });
+            ws.send(JSON.stringify({
+              type: 'CONTACT_ACCEPTED',
+              peer: targetInfo
+            }));
+          }
+          break;
+        }
+
+        case 'CONTACT_DECLINE': {
+          if (data.targetId) {
+            sendToPeer(data.targetId, {
+              type: 'CONTACT_DECLINED',
+              fromPeerId: currentPeerId
+            });
+          }
+          break;
+        }
+
         // Message Editing
         case 'MESSAGE_EDIT': {
           // Update memory session if present
           const sessionMsg = sessionMessages.find(m => m.id === data.messageId);
-          if (sessionMsg) sessionMsg.text = data.newText;
+          if (sessionMsg) {
+            sessionMsg.text = data.newText;
+            sessionMsg.isEdited = true;
+            saveMessagesToDisk();
+          }
 
           broadcast({
             type: 'MESSAGE_EDIT',
@@ -401,7 +511,10 @@ wss.on('connection', (ws, req) => {
         // Delete for Everyone
         case 'MESSAGE_DELETE': {
           const idx = sessionMessages.findIndex(m => m.id === data.messageId);
-          if (idx !== -1) sessionMessages.splice(idx, 1);
+          if (idx !== -1) {
+            sessionMessages.splice(idx, 1);
+            saveMessagesToDisk();
+          }
 
           broadcast({
             type: 'MESSAGE_DELETE',
@@ -435,7 +548,7 @@ wss.on('connection', (ws, req) => {
           break;
         }
 
-        // Multiplayer In-Chat Mini Games
+        // Multiplayer In-Chat Mini Games (3D Dice Duel & RPS Showdown)
         case 'GAME_MOVE': {
           broadcast({
             type: 'GAME_MOVE',
@@ -483,17 +596,22 @@ wss.on('connection', (ws, req) => {
           break;
         }
 
-        // Collaborative Shared Notebook Sync
+        // Context-Specific Collaborative Notebook Sync (Per-Room / Per-DM)
         case 'NOTE_UPDATE': {
-          activeSharedNote = {
+          const contextId = data.contextId || 'room_general';
+          const noteObj = {
+            contextId: contextId,
             content: data.noteContent,
             updatedBy: data.updatedBy || 'User',
             updatedAt: Date.now()
           };
+          activeSharedNotes[contextId] = noteObj;
+          saveNotesToDisk();
 
           broadcast({
             type: 'NOTE_UPDATE',
-            note: activeSharedNote,
+            contextId: contextId,
+            note: noteObj,
             senderId: currentPeerId
           }, ws);
           break;

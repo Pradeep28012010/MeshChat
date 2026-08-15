@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="description" content="Zero-Internet Offline Messaging, Calling, GPS Map, Walkie-Talkie & Survival Suite">
   <link rel="manifest" href="./manifest.json">
-  <link rel="stylesheet" href="./styles.css?v=3.3">
+  <link rel="stylesheet" href="./styles.css?v=3.4">
   <title>MeshChat — Online Cloud & Offline Mesh Suite</title>
 </head>
 <body>
@@ -1484,6 +1484,141 @@
     </div>
   </div>
 
-  <script src="./app.js?v=3.3"></script>
+  <!-- 🎲 Realistic 3D Animated Dice Roller Modal -->
+  <div class="modal-overlay" id="dice-modal-overlay">
+    <div class="modal-card" style="max-width: 420px; text-align: center;">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">🎲 3D Physics Dice Roller</h3>
+          <p class="modal-subtitle">Realistic 3D rolling animation & multiplayer duels</p>
+        </div>
+        <button class="close-btn" id="dice-modal-close-btn">&times;</button>
+      </div>
+
+      <div class="dice-3d-stage" id="dice-3d-stage">
+        <div class="dice-3d-cube" id="dice-3d-cube">
+          <div class="dice-face face-1"><span class="pip"></span></div>
+          <div class="dice-face face-2"><span class="pip"></span><span class="pip"></span></div>
+          <div class="dice-face face-3"><span class="pip"></span><span class="pip"></span><span class="pip"></span></div>
+          <div class="dice-face face-4"><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span></div>
+          <div class="dice-face face-5"><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span></div>
+          <div class="dice-face face-6"><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span></div>
+        </div>
+      </div>
+
+      <div class="dice-result-banner" id="dice-result-banner">
+        <span class="dice-result-text" id="dice-result-text">Tap roll to throw dice!</span>
+      </div>
+
+      <div class="dice-controls-row">
+        <button type="button" class="btn btn-primary" id="btn-roll-3d-dice" style="flex: 1; padding: 12px; font-weight: 700;">🎲 Roll 3D Dice</button>
+        <button type="button" class="btn btn-secondary" id="btn-share-dice-result" style="padding: 12px;">📤 Post to Chat</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⚔️ 2-Player Rock Paper Scissors Showdown Modal -->
+  <div class="modal-overlay" id="rps-modal-overlay">
+    <div class="modal-card" style="max-width: 440px; text-align: center;">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">⚔️ Rock Paper Scissors Showdown</h3>
+          <p class="modal-subtitle">Animated countdown & multiplayer battle</p>
+        </div>
+        <button class="close-btn" id="rps-modal-close-btn">&times;</button>
+      </div>
+
+      <div class="rps-arena" id="rps-arena">
+        <div class="rps-fighter-box">
+          <div class="rps-fighter-avatar" id="rps-self-avatar">You</div>
+          <div class="rps-fighter-hand" id="rps-self-hand">✊</div>
+        </div>
+        <div class="rps-vs-badge" id="rps-status-badge">VS</div>
+        <div class="rps-fighter-box">
+          <div class="rps-fighter-avatar" id="rps-peer-avatar">Opponent</div>
+          <div class="rps-fighter-hand" id="rps-peer-hand">✊</div>
+        </div>
+      </div>
+
+      <div class="rps-result-text" id="rps-result-text">Pick your move!</div>
+
+      <div class="rps-choices-grid">
+        <button type="button" class="rps-choice-btn" data-choice="rock">
+          <span class="rps-emoji">🪨</span>
+          <span class="rps-label">Rock</span>
+        </button>
+        <button type="button" class="rps-choice-btn" data-choice="paper">
+          <span class="rps-emoji">📄</span>
+          <span class="rps-label">Paper</span>
+        </button>
+        <button type="button" class="rps-choice-btn" data-choice="scissors">
+          <span class="rps-emoji">✂️</span>
+          <span class="rps-label">Scissors</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 📩 Instagram-Style Contact Connection Request Toast -->
+  <div class="contact-request-toast" id="contact-request-toast" style="display: none;">
+    <div class="contact-toast-content">
+      <div class="peer-avatar user" id="contact-req-avatar">U</div>
+      <div class="contact-toast-text">
+        <strong id="contact-req-name">User</strong>
+        <p>wants to connect with you on MeshChat</p>
+      </div>
+    </div>
+    <div class="contact-toast-actions">
+      <button type="button" class="btn btn-primary btn-sm" id="btn-accept-contact-req">Accept</button>
+      <button type="button" class="btn btn-secondary btn-sm" id="btn-decline-contact-req">Decline</button>
+    </div>
+  </div>
+
+  <!-- 🖱️ Universal App Context Menu (Desktop Right-Click & Mobile Long-Press) -->
+  <div class="app-context-menu" id="app-context-menu" style="display: none;">
+    <!-- Quick Emoji Reactions Strip -->
+    <div class="context-reactions-strip">
+      <button type="button" class="ctx-react-btn" data-emoji="👍">👍</button>
+      <button type="button" class="ctx-react-btn" data-emoji="❤️">❤️</button>
+      <button type="button" class="ctx-react-btn" data-emoji="🔥">🔥</button>
+      <button type="button" class="ctx-react-btn" data-emoji="😂">😂</button>
+      <button type="button" class="ctx-react-btn" data-emoji="👏">👏</button>
+      <button type="button" class="ctx-react-btn" data-emoji="🎉">🎉</button>
+    </div>
+    <div class="ctx-divider"></div>
+    <div class="context-menu-list">
+      <button type="button" class="ctx-menu-item" id="ctx-action-reply">
+        <span class="ctx-icon">↩</span>
+        <span>Reply</span>
+      </button>
+      <button type="button" class="ctx-menu-item" id="ctx-action-edit">
+        <span class="ctx-icon">✏️</span>
+        <span>Edit Message</span>
+      </button>
+      <button type="button" class="ctx-menu-item" id="ctx-action-pin">
+        <span class="ctx-icon">📌</span>
+        <span>Pin Announcement</span>
+      </button>
+      <button type="button" class="ctx-menu-item" id="ctx-action-star">
+        <span class="ctx-icon">⭐</span>
+        <span id="ctx-star-label">Star Message</span>
+      </button>
+      <button type="button" class="ctx-menu-item" id="ctx-action-copy">
+        <span class="ctx-icon">📋</span>
+        <span>Copy Text</span>
+      </button>
+      <div class="ctx-divider"></div>
+      <button type="button" class="ctx-menu-item ctx-danger" id="ctx-action-delete-everyone">
+        <span class="ctx-icon">🗑️</span>
+        <span>Delete for Everyone</span>
+      </button>
+      <button type="button" class="ctx-menu-item ctx-danger" id="ctx-action-delete-me">
+        <span class="ctx-icon">🗑️</span>
+        <span>Delete for Me</span>
+      </button>
+    </div>
+  </div>
+
+  <script src="./app.js?v=3.4"></script>
 </body>
 </html>
