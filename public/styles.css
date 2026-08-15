@@ -3597,6 +3597,198 @@ body.dark-theme .msg-text code { background: rgba(255, 255, 255, 0.15); }
   margin-left: 6px;
 }
 
+/* ==========================================================
+   ⏱️ SYNCHRONIZED GROUP COUNTDOWN TIMER
+   ========================================================== */
+.timer-display-box {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-divider);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.timer-digits {
+  font-size: 48px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  color: var(--accent-blue);
+  letter-spacing: 2px;
+}
+
+.timer-title-badge {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.timer-presets-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.timer-preset-btn {
+  flex: 1;
+  padding: 8px 4px;
+  font-size: 11.5px;
+}
+
+.timer-controls-row {
+  display: flex;
+  gap: 8px;
+}
+
+.timer-controls-row .btn {
+  flex: 1;
+}
+
+/* ==========================================================
+   💰 GROUP EXPENSE SPLITTER & TALLY
+   ========================================================== */
+.expenses-modal-card {
+  max-width: 480px;
+}
+
+.expense-add-box {
+  margin-bottom: 14px;
+}
+
+.expense-inputs-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 8px;
+}
+
+.expenses-summary-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-divider);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.exp-summary-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.exp-summary-row strong {
+  color: var(--accent-blue);
+  font-family: var(--font-mono);
+  font-size: 14px;
+}
+
+.expenses-list {
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid var(--border-divider);
+  border-radius: var(--radius-md);
+  margin-bottom: 10px;
+}
+
+.expense-item-card {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-divider);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12.5px;
+}
+
+.expense-item-card:last-child {
+  border-bottom: none;
+}
+
+.settlement-box {
+  background: rgba(52, 199, 89, 0.08);
+  border: 1px dashed rgba(52, 199, 89, 0.4);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  font-size: 12px;
+}
+
+.settlement-item {
+  color: #34c759;
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+/* ==========================================================
+   🏷️ @MENTIONS AUTO-COMPLETE
+   ========================================================== */
+.mention-suggestions-popup {
+  position: absolute;
+  bottom: 100%;
+  left: 12px;
+  right: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-divider);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  max-height: 140px;
+  overflow-y: auto;
+  z-index: 100;
+  margin-bottom: 6px;
+}
+
+.mention-suggestion-item {
+  padding: 8px 12px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background var(--trans-fast);
+}
+
+.mention-suggestion-item:hover {
+  background: var(--bg-hover);
+}
+
+.mention-badge {
+  background: rgba(0, 122, 255, 0.18);
+  color: var(--accent-blue);
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-weight: 600;
+}
+
+/* ==========================================================
+   🔴 TACTICAL NIGHT-VISION RED-LIGHT THEME (Zero White Light)
+   ========================================================== */
+body.red-vision-theme {
+  --bg-app: #000000;
+  --bg-sidebar: #050000;
+  --bg-card: #0d0000;
+  --bg-surface: #140000;
+  --bg-hover: #220000;
+  --border-divider: #330000;
+  --text-primary: #ff3b30;
+  --text-secondary: #cc2211;
+  --text-tertiary: #881100;
+  --accent-blue: #ff3b30;
+  --accent-blue-tint: rgba(255, 59, 48, 0.15);
+}
+
+body.red-vision-theme .msg-row.self .msg-bubble {
+  background-color: #ff3b30;
+  color: #000000;
+}
+
+body.red-vision-theme .msg-row.peer .msg-bubble {
+  background-color: #140000;
+  color: #ff3b30;
+  border-color: #440000;
+}
+
+
 
 
 

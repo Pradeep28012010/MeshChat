@@ -1,6 +1,10 @@
 /**
  * MeshChat — Comprehensive Offline & Online Suite
  * Power & Next-Gen Modules:
+ * - ⏱️ Synchronized Group Timer & Rendezvous Countdown
+ * - 💰 Group Expense Splitter & "Who Owes Who" Tally Calculator
+ * - 🏷️ Interactive @Mentions Auto-Complete & Mention Highlights
+ * - 🔴 Tactical Night-Vision Red-Light OLED Mode
  * - 📋 Real-Time Collaborative Sync Notes & Checklist
  * - 📊 Network Diagnostics, Health & Ping Telemetry HUD
  * - 📸 In-App Snapshot Camera with Filters (B&W, Vintage, Night-Vision)
@@ -44,6 +48,19 @@
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
       osc.start(now);
       osc.stop(now + 0.22);
+    } else if (type === 'timer_done') {
+      [880, 1174.66, 880, 1174.66].forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now + i * 0.18);
+        gain.gain.setValueAtTime(0.2, now + i * 0.18);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.18 + 0.16);
+        osc.start(now + i * 0.18);
+        osc.stop(now + i * 0.18 + 0.16);
+      });
     } else if (type === 'game_move') {
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
@@ -349,6 +366,7 @@
       name: localStorage.getItem('mesh_peer_name') || 'User_' + Math.floor(100 + Math.random() * 900)
     },
     theme: localStorage.getItem('mesh_theme') || 'light',
+    isRedVision: localStorage.getItem('mesh_red_vision') === 'true',
     wallpaper: localStorage.getItem('mesh_wallpaper') || 'default',
     accentColor: localStorage.getItem('mesh_accent_color') || '#007aff',
     activeView: 'chat',
@@ -370,6 +388,19 @@
       updatedBy: "System",
       updatedAt: Date.now()
     },
+
+    // Synchronized Timer
+    sharedTimer: {
+      title: "Group Countdown",
+      durationSec: 300,
+      startedAt: null,
+      isRunning: false,
+      senderName: "System"
+    },
+    timerInterval: null,
+
+    // Group Expenses
+    sharedExpenses: JSON.parse(localStorage.getItem('mesh_shared_expenses') || '[]'),
 
     // Starred Vault & Disappearing Timer
     starredIds: new Set(JSON.parse(localStorage.getItem('mesh_starred_ids') || '[]')),
@@ -490,6 +521,7 @@
 
   localStorage.setItem('mesh_peer_name', state.self.name);
   if (state.theme === 'dark') document.body.classList.add('dark-theme');
+  if (state.isRedVision) document.body.classList.add('red-vision-theme');
 
   // --- 5. DOM Elements Cache ---
   const elements = {
@@ -519,6 +551,34 @@
     viewPaneChat: document.getElementById('view-pane-chat'),
     viewPaneMap: document.getElementById('view-pane-map'),
     viewPanePtt: document.getElementById('view-pane-ptt'),
+
+    // Timer Modal
+    btnOpenTimer: document.getElementById('btn-open-timer'),
+    timerModalOverlay: document.getElementById('timer-modal-overlay'),
+    timerModalCloseBtn: document.getElementById('timer-modal-close-btn'),
+    timerDigitsVal: document.getElementById('timer-digits-val'),
+    timerTitleBadge: document.getElementById('timer-title-badge'),
+    btnStartSyncTimer: document.getElementById('btn-start-sync-timer'),
+    btnStopSyncTimer: document.getElementById('btn-stop-sync-timer'),
+
+    // Expenses Modal
+    btnOpenExpenses: document.getElementById('btn-open-expenses'),
+    expensesModalOverlay: document.getElementById('expenses-modal-overlay'),
+    expensesModalCloseBtn: document.getElementById('expenses-modal-close-btn'),
+    expenseDescInput: document.getElementById('expense-desc-input'),
+    expenseAmountInput: document.getElementById('expense-amount-input'),
+    btnSubmitAddExpense: document.getElementById('btn-submit-add-expense'),
+    expTotalSpend: document.getElementById('exp-total-spend'),
+    expPerPerson: document.getElementById('exp-per-person'),
+    expensesList: document.getElementById('expenses-list'),
+    settlementBox: document.getElementById('settlement-box'),
+    btnResetExpenses: document.getElementById('btn-reset-expenses'),
+
+    // Red Vision Mode
+    btnToggleRedMode: document.getElementById('btn-toggle-red-mode'),
+
+    // @Mentions Suggestions
+    mentionSuggestionsPopup: document.getElementById('mention-suggestions-popup'),
 
     // Collaborative Notes
     btnOpenNotes: document.getElementById('btn-open-notes'),
@@ -782,7 +842,285 @@
     btnCallEnd: document.getElementById('btn-call-end')
   };
 
-  // --- 6. 📋 Collaborative Sync Notes Engine ---
+  // --- 6. ⏱️ Synchronized Group Timer Engine ---
+  function openTimerModal() {
+    updateTimerDisplay();
+    elements.timerModalOverlay.classList.add('active');
+  }
+
+  function startSyncTimer(durationSec = 300, title = 'Group Timer') {
+    state.sharedTimer = {
+      title: title,
+      durationSec: durationSec,
+      startedAt: Date.now(),
+      isRunning: true,
+      senderName: state.self.name
+    };
+
+    updateTimerDisplay();
+    startLocalTimerTicker();
+
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+      state.ws.send(JSON.stringify({
+        type: 'TIMER_SYNC',
+        title: title,
+        durationSec: durationSec,
+        startedAt: state.sharedTimer.startedAt,
+        isRunning: true,
+        senderName: state.self.name
+      }));
+    }
+  }
+
+  function stopSyncTimer() {
+    state.sharedTimer.isRunning = false;
+    state.sharedTimer.startedAt = null;
+    if (state.timerInterval) clearInterval(state.timerInterval);
+    updateTimerDisplay();
+
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+      state.ws.send(JSON.stringify({
+        type: 'TIMER_SYNC',
+        isRunning: false,
+        durationSec: state.sharedTimer.durationSec,
+        title: state.sharedTimer.title
+      }));
+    }
+  }
+
+  function startLocalTimerTicker() {
+    if (state.timerInterval) clearInterval(state.timerInterval);
+    state.timerInterval = setInterval(() => {
+      if (!state.sharedTimer.isRunning || !state.sharedTimer.startedAt) {
+        clearInterval(state.timerInterval);
+        return;
+      }
+
+      const elapsed = Math.floor((Date.now() - state.sharedTimer.startedAt) / 1000);
+      const remain = Math.max(0, state.sharedTimer.durationSec - elapsed);
+
+      const mins = String(Math.floor(remain / 60)).padStart(2, '0');
+      const secs = String(remain % 60).padStart(2, '0');
+      elements.timerDigitsVal.textContent = `${mins}:${secs}`;
+
+      if (remain <= 0) {
+        state.sharedTimer.isRunning = false;
+        clearInterval(state.timerInterval);
+        playSound('timer_done');
+        alert(`⏱️ COUNTDOWN COMPLETE: "${state.sharedTimer.title}" has finished!`);
+      }
+    }, 500);
+  }
+
+  function updateTimerDisplay() {
+    if (state.sharedTimer.isRunning && state.sharedTimer.startedAt) {
+      const elapsed = Math.floor((Date.now() - state.sharedTimer.startedAt) / 1000);
+      const remain = Math.max(0, state.sharedTimer.durationSec - elapsed);
+      const mins = String(Math.floor(remain / 60)).padStart(2, '0');
+      const secs = String(remain % 60).padStart(2, '0');
+      elements.timerDigitsVal.textContent = `${mins}:${secs}`;
+      elements.btnStartSyncTimer.textContent = 'Timer Running';
+    } else {
+      const mins = String(Math.floor(state.sharedTimer.durationSec / 60)).padStart(2, '0');
+      const secs = String(state.sharedTimer.durationSec % 60).padStart(2, '0');
+      elements.timerDigitsVal.textContent = `${mins}:${secs}`;
+      elements.btnStartSyncTimer.textContent = 'Start Timer for All';
+    }
+    elements.timerTitleBadge.textContent = state.sharedTimer.title || 'Group Timer';
+  }
+
+  function handleIncomingTimerSync(data) {
+    if (data.timer) {
+      state.sharedTimer = data.timer;
+      updateTimerDisplay();
+      if (state.sharedTimer.isRunning) {
+        startLocalTimerTicker();
+      } else if (state.timerInterval) {
+        clearInterval(state.timerInterval);
+      }
+    }
+  }
+
+  // --- 7. 💰 Group Expense Splitter Engine ---
+  function openExpensesModal() {
+    renderExpensesList();
+    elements.expensesModalOverlay.classList.add('active');
+  }
+
+  function addExpenseItem() {
+    const desc = elements.expenseDescInput.value.trim();
+    const amt = parseFloat(elements.expenseAmountInput.value);
+
+    if (!desc || isNaN(amt) || amt <= 0) {
+      alert('Please enter a valid expense description and amount.');
+      return;
+    }
+
+    const exp = {
+      id: 'exp_' + Date.now(),
+      desc: desc,
+      amount: amt,
+      paidBy: state.self.name,
+      timestamp: Date.now()
+    };
+
+    state.sharedExpenses.push(exp);
+    localStorage.setItem('mesh_shared_expenses', JSON.stringify(state.sharedExpenses));
+
+    elements.expenseDescInput.value = '';
+    elements.expenseAmountInput.value = '';
+    renderExpensesList();
+
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+      state.ws.send(JSON.stringify({
+        type: 'EXPENSE_ADD',
+        expense: exp
+      }));
+    }
+  }
+
+  function resetAllExpenses() {
+    if (!confirm('Reset all logged shared expenses?')) return;
+    state.sharedExpenses = [];
+    localStorage.removeItem('mesh_shared_expenses');
+    renderExpensesList();
+
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+      state.ws.send(JSON.stringify({ type: 'EXPENSE_RESET' }));
+    }
+  }
+
+  function renderExpensesList() {
+    elements.expensesList.innerHTML = '';
+    let total = 0;
+    const paidByMap = {};
+
+    state.sharedExpenses.forEach(exp => {
+      total += exp.amount;
+      paidByMap[exp.paidBy] = (paidByMap[exp.paidBy] || 0) + exp.amount;
+
+      const item = document.createElement('div');
+      item.className = 'expense-item-card';
+      item.innerHTML = `
+        <div>
+          <strong>${escapeHtml(exp.desc)}</strong>
+          <div style="font-size: 11px; opacity: 0.65;">Paid by ${escapeHtml(exp.paidBy)}</div>
+        </div>
+        <strong style="color: #34c759; font-family: var(--font-mono);">$${exp.amount.toFixed(2)}</strong>
+      `;
+      elements.expensesList.appendChild(item);
+    });
+
+    if (state.sharedExpenses.length === 0) {
+      elements.expensesList.innerHTML = '<div class="ptt-log-item empty">No expenses logged yet. Add your first shared item!</div>';
+    }
+
+    const peerCount = Math.max(1, state.peers.size);
+    const perPerson = total / peerCount;
+
+    elements.expTotalSpend.textContent = `$${total.toFixed(2)}`;
+    elements.expPerPerson.textContent = `$${perPerson.toFixed(2)} (${peerCount} people)`;
+
+    // Settlement Tally
+    elements.settlementBox.innerHTML = '';
+    if (total > 0) {
+      elements.settlementBox.innerHTML = `<div style="font-weight:700; margin-bottom:4px;">📊 Settlement Breakdown:</div>`;
+      for (const [payer, amt] of Object.entries(paidByMap)) {
+        const net = amt - perPerson;
+        const div = document.createElement('div');
+        div.className = 'settlement-item';
+        if (net > 0) {
+          div.textContent = `✔ ${payer} gets back $${net.toFixed(2)}`;
+        } else if (net < 0) {
+          div.textContent = `➜ ${payer} owes $${Math.abs(net).toFixed(2)}`;
+          div.style.color = '#ff9500';
+        } else {
+          div.textContent = `✔ ${payer} is all settled`;
+        }
+        elements.settlementBox.appendChild(div);
+      }
+    }
+  }
+
+  function handleIncomingExpenseAdd(data) {
+    if (data.expenses) {
+      state.sharedExpenses = data.expenses;
+    } else if (data.expense && !state.sharedExpenses.find(e => e.id === data.expense.id)) {
+      state.sharedExpenses.push(data.expense);
+    }
+    localStorage.setItem('mesh_shared_expenses', JSON.stringify(state.sharedExpenses));
+    if (elements.expensesModalOverlay.classList.contains('active')) {
+      renderExpensesList();
+    }
+  }
+
+  function handleIncomingExpenseReset() {
+    state.sharedExpenses = [];
+    localStorage.removeItem('mesh_shared_expenses');
+    if (elements.expensesModalOverlay.classList.contains('active')) {
+      renderExpensesList();
+    }
+  }
+
+  // --- 8. 🔴 Tactical Night-Vision Red Mode ---
+  function toggleRedVisionMode() {
+    state.isRedVision = !state.isRedVision;
+    localStorage.setItem('mesh_red_vision', state.isRedVision);
+    document.body.classList.toggle('red-vision-theme', state.isRedVision);
+    if (state.activeView === 'map') resizeAndDrawMap();
+  }
+
+  // --- 9. 🏷️ @Mentions Auto-Complete & Mention Highlighter ---
+  function initMentionsEngine() {
+    const input = elements.chatMessageInput;
+    const popup = elements.mentionSuggestionsPopup;
+
+    input.addEventListener('input', () => {
+      const val = input.value;
+      const cursorPos = input.selectionStart;
+      const lastAt = val.lastIndexOf('@', cursorPos - 1);
+
+      if (lastAt !== -1 && (lastAt === 0 || /\s/.test(val[lastAt - 1]))) {
+        const query = val.slice(lastAt + 1, cursorPos).toLowerCase();
+        const matches = [];
+
+        state.peers.forEach(peer => {
+          if (peer.name.toLowerCase().includes(query)) {
+            matches.push(peer.name);
+          }
+        });
+
+        if (matches.length > 0) {
+          popup.innerHTML = '';
+          matches.forEach(name => {
+            const item = document.createElement('div');
+            item.className = 'mention-suggestion-item';
+            item.innerHTML = `<span>👤</span> <strong>@${escapeHtml(name)}</strong>`;
+            item.onclick = () => {
+              const before = val.slice(0, lastAt);
+              const after = val.slice(cursorPos);
+              input.value = `${before}@${name} ${after}`;
+              popup.style.display = 'none';
+              input.focus();
+            };
+            popup.appendChild(item);
+          });
+          popup.style.display = 'block';
+          return;
+        }
+      }
+
+      popup.style.display = 'none';
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!popup.contains(e.target) && e.target !== input) {
+        popup.style.display = 'none';
+      }
+    });
+  }
+
+  // --- 10. 📋 Collaborative Sync Notes Engine ---
   function openNotesModal() {
     elements.notesTextarea.value = state.sharedNote.content || '';
     elements.notesAuthorBadge.textContent = `Last edit: ${state.sharedNote.updatedBy} (${formatTime(state.sharedNote.updatedAt)})`;
@@ -819,7 +1157,7 @@
     }
   }
 
-  // --- 7. 📊 Network Diagnostics & Ping Telemetry ---
+  // --- 11. 📊 Network Diagnostics & Ping Telemetry ---
   function openNetworkHud() {
     elements.hudPeersVal.textContent = `${state.peers.size} Active`;
     elements.hudPacketsVal.textContent = `${state.telemetry.packetsCount + 12} pkts`;
@@ -860,7 +1198,7 @@
     });
   }
 
-  // --- 8. 📸 In-App Snapshot Camera & Filters ---
+  // --- 12. 📸 In-App Snapshot Camera & Filters ---
   async function openCameraModal() {
     elements.cameraModalOverlay.classList.add('active');
     elements.cameraLiveVideo.style.display = 'block';
@@ -931,7 +1269,7 @@
     await dispatchMessage(msg);
   }
 
-  // --- 9. View & Channel Switching ---
+  // --- 13. View & Channel Switching ---
   function switchView(viewName) {
     state.activeView = viewName;
     
@@ -1033,7 +1371,7 @@
     }
   }
 
-  // --- 10. ⭐ Starred Messages Vault ---
+  // --- 14. ⭐ Starred Messages Vault ---
   function toggleStarMessage(msgId) {
     if (state.starredIds.has(msgId)) {
       state.starredIds.delete(msgId);
@@ -1077,7 +1415,7 @@
     openStarredVaultModal();
   };
 
-  // --- 11. 🗓️ Group Events & Calendar Scheduler ---
+  // --- 15. 🗓️ Group Events & Calendar Scheduler ---
   async function submitCreateEvent() {
     const title = elements.eventTitleInput.value.trim();
     const datetime = elements.eventDatetimeInput.value.trim();
@@ -1156,7 +1494,7 @@
     }
   }
 
-  // --- 12. 🎮 Multiplayer In-Chat Games ---
+  // --- 16. 🎮 Multiplayer In-Chat Games ---
   async function startTicTacToeGame() {
     elements.gamesModalOverlay.classList.remove('active');
 
@@ -1287,7 +1625,7 @@
     }
   }
 
-  // --- 13. Appearance & Themes ---
+  // --- 17. Appearance & Themes ---
   function toggleAppearance() {
     state.theme = state.theme === 'dark' ? 'light' : 'dark';
     localStorage.setItem('mesh_theme', state.theme);
@@ -1313,7 +1651,7 @@
     elements.sidebarBackdrop.classList.remove('active');
   }
 
-  // --- 14. Apple Battery Monitor ---
+  // --- 18. Battery Monitor ---
   async function initBatteryMonitor() {
     if ('getBattery' in navigator) {
       try {
@@ -1345,7 +1683,7 @@
     }
   }
 
-  // --- 15. 🧭 Digital Compass Sensor ---
+  // --- 19. 🧭 Digital Compass Sensor ---
   function initCompassSensor() {
     if ('DeviceOrientationEvent' in window) {
       const handleOrientation = (e) => {
@@ -1407,7 +1745,7 @@
     return (θ * 180 / Math.PI + 360) % 360;
   }
 
-  // --- 16. 🤖 Offline AI Survival Assistant ---
+  // --- 20. 🤖 Offline AI Survival Assistant ---
   const OFFLINE_AI_KNOWLEDGE = [
     {
       keywords: ['snake', 'bite', 'viper', 'rattlesnake', 'cobra', 'venom'],
@@ -1476,7 +1814,7 @@
       .replace(/\n/g, '<br>');
   }
 
-  // --- 17. 📊 Interactive Group Polls ---
+  // --- 21. 📊 Interactive Group Polls ---
   function openPollModal() {
     elements.pollQuestionInput.value = '';
     elements.pollOptionsInputs.innerHTML = `
@@ -1575,7 +1913,7 @@
     }
   }
 
-  // --- 18. ⏱️ Disappearing Messages Lifecycle & Timer ---
+  // --- 22. ⏱️ Disappearing Messages Lifecycle & Timer ---
   function openDisappearingModal() {
     document.querySelectorAll('.disappearing-opt-btn').forEach(btn => {
       const sec = parseInt(btn.dataset.seconds, 10);
@@ -1612,7 +1950,7 @@
     }
   }, 1000);
 
-  // --- 19. ✏️ Message Editing & Delete for Everyone ---
+  // --- 23. ✏️ Message Editing & Delete for Everyone ---
   function startEditingMessage(msg) {
     state.editingMessageId = msg.id;
     elements.editSnippet.textContent = msg.text || '';
@@ -1686,7 +2024,7 @@
     if (row) row.remove();
   }
 
-  // --- 20. 📌 Pinned Announcement Banner ---
+  // --- 24. 📌 Pinned Announcement Banner ---
   function pinMessageToTop(msg) {
     state.pinnedMessage = msg;
     localStorage.setItem('mesh_pinned_msg', JSON.stringify(msg));
@@ -1744,7 +2082,7 @@
     renderPinnedBanner();
   }
 
-  // --- 21. 🎨 Wallpaper & Accent Themes ---
+  // --- 25. 🎨 Wallpaper & Accent Themes ---
   function openWallpaperModal() {
     document.querySelectorAll('.wallpaper-thumb').forEach(th => {
       th.classList.toggle('active', th.dataset.bg === state.wallpaper);
@@ -1762,7 +2100,7 @@
     elements.wallpaperModalOverlay.classList.remove('active');
   }
 
-  // --- 22. 🚨 Geofence Engine ---
+  // --- 26. 🚨 Geofence Engine ---
   function checkGeofenceProximity(myLat, myLon) {
     if (!state.geofence.enabled) return;
 
@@ -1824,7 +2162,7 @@
     if (state.activeView === 'map') drawMap();
   }
 
-  // --- 23. 🎙️ VOX Hands-Free Radio ---
+  // --- 27. 🎙️ VOX Hands-Free Radio ---
   async function toggleVoxMode() {
     state.vox.enabled = !state.vox.enabled;
     elements.btnToggleVox.classList.toggle('active', state.vox.enabled);
@@ -1898,7 +2236,7 @@
     if (state.ptt.isTransmitting && !state.ptt.isLocked) stopPttTransmission();
   }
 
-  // --- 24. ⛰️ Elevation Tracker ---
+  // --- 28. ⛰️ Elevation Tracker ---
   function recordElevation(alt) {
     if (typeof alt !== 'number' || isNaN(alt)) return;
     const rounded = Math.round(alt);
@@ -1964,7 +2302,7 @@
     elements.weatherRiskPill.classList.toggle('warning', stormRisk !== 'Low');
   }
 
-  // --- 25. 🔦 Optical Morse Code Flasher ---
+  // --- 29. 🔦 Optical Morse Code Flasher ---
   const MORSE_MAP = {
     'A': '.-', 'B': '-...', 'C': '-.-.', 'D': '-..', 'E': '.', 'F': '..-.',
     'G': '--.', 'H': '....', 'I': '..', 'J': '.---', 'K': '-.-', 'L': '.-..',
@@ -2036,7 +2374,7 @@
     elements.btnStopMorse.style.display = 'none';
   }
 
-  // --- 26. 🎯 Tactical 360° Radar Canvas ---
+  // --- 30. 🎯 Tactical 360° Radar Canvas ---
   function initTacticalRadar() {
     elements.radarModalOverlay.classList.add('active');
     renderRadarLoop();
@@ -2128,7 +2466,7 @@
     }
   }
 
-  // --- 27. 📡 Multi-Hop Mesh Relay Engine ---
+  // --- 31. 📡 Multi-Hop Mesh Relay Engine ---
   async function dispatchMeshRelayPacket(payload, targetId = 'broadcast') {
     const packet = {
       id: 'pkt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
@@ -2170,7 +2508,7 @@
     }
   }
 
-  // --- 28. 📦 Chunked P2P File Exchanger ---
+  // --- 32. 📦 Chunked P2P File Exchanger ---
   const CHUNK_SIZE = 48 * 1024;
 
   async function sendFileInChunks(file, targetId = 'broadcast') {
@@ -2272,7 +2610,7 @@
     }
   }
 
-  // --- 29. Emergency SOS Beacon & Roll Call ---
+  // --- 33. Emergency SOS Beacon & Roll Call ---
   async function activateSosBeacon() {
     state.sos.active = true;
     elements.sosModalOverlay.classList.add('active');
@@ -2386,7 +2724,7 @@
     `;
   }
 
-  // --- 30. WebSocket Resilient Hub Client ---
+  // --- 34. WebSocket Resilient Hub Client ---
   let reconnectTimer = null;
   let clientHeartbeatInterval = null;
 
@@ -2469,6 +2807,8 @@
       case 'PEER_LIST_UPDATE':
         renderPeerList(data.peers);
         if (data.sharedNote) handleIncomingNoteUpdate({ note: data.sharedNote });
+        if (data.sharedTimer) handleIncomingTimerSync({ timer: data.sharedTimer });
+        if (data.sharedExpenses) handleIncomingExpenseAdd({ expenses: data.sharedExpenses });
         if (data.type === 'WELCOME' && data.recentMessages && data.recentMessages.length > 0) {
           for (const rawMsg of data.recentMessages) {
             const msg = await decryptPayload(rawMsg);
@@ -2494,9 +2834,28 @@
       case 'CHAT_MESSAGE': {
         const msg = await decryptPayload(data.message);
         appendMessage(msg, data.isSelf || msg.senderId === state.self.id);
-        if (!data.isSelf && msg.senderId !== state.self.id) playSound('message');
+        
+        // Mention notification
+        if (msg.text && msg.text.includes(`@${state.self.name}`) && msg.senderId !== state.self.id) {
+          if ('vibrate' in navigator) navigator.vibrate([100, 50, 100]);
+          playSound('message');
+        } else if (!data.isSelf && msg.senderId !== state.self.id) {
+          playSound('message');
+        }
         break;
       }
+
+      case 'TIMER_SYNC':
+        handleIncomingTimerSync(data);
+        break;
+
+      case 'EXPENSE_ADD':
+        handleIncomingExpenseAdd(data);
+        break;
+
+      case 'EXPENSE_RESET':
+        handleIncomingExpenseReset();
+        break;
 
       case 'POLL_VOTE':
         handleIncomingPollVote(data);
@@ -2621,7 +2980,7 @@
     }
   }
 
-  // --- 31. Walkie-Talkie Push-to-Talk ---
+  // --- 35. Walkie-Talkie Push-to-Talk ---
   let pttSelectedIcon = '⛺';
 
   async function startPttTransmission() {
@@ -2723,7 +3082,7 @@
     elements.pttLogList.prepend(item);
   }
 
-  // --- 32. GPS Map Engine & Breadcrumbs ---
+  // --- 36. GPS Map Engine & Breadcrumbs ---
   let mapCanvasCtx = null;
 
   function initMapEngine() {
@@ -2804,7 +3163,7 @@
     const w = elements.offlineMapCanvas.width;
     const h = elements.offlineMapCanvas.height;
 
-    const isDark = document.body.classList.contains('dark-theme');
+    const isDark = document.body.classList.contains('dark-theme') || document.body.classList.contains('red-vision-theme');
     mapCanvasCtx.fillStyle = isDark ? '#0f121a' : '#1b202c';
     mapCanvasCtx.fillRect(0, 0, w, h);
 
@@ -2978,7 +3337,7 @@
     if (state.activeView === 'map') drawMap();
   }
 
-  // --- 33. Peer List Rendering ---
+  // --- 37. Peer List Rendering ---
   function getInitials(name) {
     if (!name) return 'U';
     const parts = name.trim().split(/\s+/);
@@ -3071,11 +3430,12 @@
     return directions[idx];
   }
 
-  // --- 34. Rich Text Markdown Formatter ---
+  // --- 38. Rich Text & @Mentions Markdown Formatter ---
   function formatRichText(raw) {
     if (!raw) return '';
     let t = escapeHtml(raw);
 
+    // Markdown
     t = t.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
     t = t.replace(/`([^`]+)`/g, '<code>$1</code>');
     t = t.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
@@ -3083,10 +3443,13 @@
     t = t.replace(/~([^~]+)~/g, '<del>$1</del>');
     t = t.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
 
+    // @Mentions
+    t = t.replace(/@([a-zA-Z0-9_-]+)/g, '<span class="mention-badge">@$1</span>');
+
     return t;
   }
 
-  // --- 35. Message Rendering & History ---
+  // --- 39. Message Rendering & History ---
   function appendMessage(msg, isSelf = false) {
     if (!msg.reactions) msg.reactions = {};
     
@@ -3581,7 +3944,7 @@
     );
   }
 
-  // --- 36. Freeform Sketch Pad ---
+  // --- 40. Freeform Sketch Pad ---
   let canvasCtx = null;
 
   function initSketchCanvas() {
@@ -3680,7 +4043,7 @@
     await dispatchMessage(msg);
   }
 
-  // --- 37. Export Transcript ---
+  // --- 41. Export Transcript ---
   async function exportChatTranscript() {
     const allMsgs = await loadStoredMessages();
     if (allMsgs.length === 0) {
@@ -3714,7 +4077,7 @@
     URL.revokeObjectURL(url);
   }
 
-  // --- 38. Message Dispatch Helper ---
+  // --- 42. Message Dispatch Helper ---
   async function dispatchMessage(msgObj) {
     if (state.replyingTo) {
       msgObj.quotedMsg = state.replyingTo;
@@ -3738,7 +4101,7 @@
     }
   }
 
-  // --- 39. Voice Memo Recording ---
+  // --- 43. Voice Memo Recording ---
   async function toggleVoiceRecording() {
     if (!state.isRecording) {
       try {
@@ -3788,7 +4151,7 @@
     }
   }
 
-  // --- 40. File & Photo Sharing ---
+  // --- 44. File & Photo Sharing ---
   function handleFileSelect(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -3845,7 +4208,7 @@
     elements.chatMessageInput.value = '';
   }
 
-  // --- 41. WebRTC Calling Engine ---
+  // --- 45. WebRTC Calling Engine ---
   async function initiateCall(isVideo) {
     if (state.activeTargetId === 'broadcast') {
       alert('Please select a specific peer from the sidebar to start a call.');
@@ -4155,7 +4518,7 @@
     elements.btnCallVideoToggle.classList.remove('muted');
   }
 
-  // --- 42. Encryption & QR Modals ---
+  // --- 46. Encryption & QR Modals ---
   function openEncryptionModal() {
     elements.roomPassphraseInput.value = state.passphrase;
     elements.encryptionModalOverlay.classList.add('active');
@@ -4246,7 +4609,7 @@
     renderMessagesForActiveTarget();
   }
 
-  // --- 43. Event Listeners Initialization ---
+  // --- 47. Event Listeners Initialization ---
   function initEventListeners() {
     // Desktop View Tabs
     if (elements.tabBtnChat) elements.tabBtnChat.addEventListener('click', () => switchView('chat'));
@@ -4262,6 +4625,29 @@
     // Sidebar Backdrop & Drawer Controls
     if (elements.sidebarBackdrop) elements.sidebarBackdrop.addEventListener('click', closeSidebarDrawer);
     if (elements.btnCloseSidebar) elements.btnCloseSidebar.addEventListener('click', closeSidebarDrawer);
+
+    // Synchronized Timer
+    if (elements.btnOpenTimer) elements.btnOpenTimer.addEventListener('click', openTimerModal);
+    if (elements.timerModalCloseBtn) elements.timerModalCloseBtn.addEventListener('click', () => elements.timerModalOverlay.classList.remove('active'));
+    if (elements.btnStartSyncTimer) elements.btnStartSyncTimer.addEventListener('click', () => startSyncTimer(state.sharedTimer.durationSec));
+    if (elements.btnStopSyncTimer) elements.btnStopSyncTimer.addEventListener('click', stopSyncTimer);
+
+    document.querySelectorAll('.timer-preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const sec = parseInt(btn.dataset.sec, 10);
+        state.sharedTimer.durationSec = sec;
+        startSyncTimer(sec, btn.textContent);
+      });
+    });
+
+    // Expenses Splitter
+    if (elements.btnOpenExpenses) elements.btnOpenExpenses.addEventListener('click', openExpensesModal);
+    if (elements.expensesModalCloseBtn) elements.expensesModalCloseBtn.addEventListener('click', () => elements.expensesModalOverlay.classList.remove('active'));
+    if (elements.btnSubmitAddExpense) elements.btnSubmitAddExpense.addEventListener('click', addExpenseItem);
+    if (elements.btnResetExpenses) elements.btnResetExpenses.addEventListener('click', resetAllExpenses);
+
+    // Red Vision Mode
+    if (elements.btnToggleRedMode) elements.btnToggleRedMode.addEventListener('click', toggleRedVisionMode);
 
     // Collaborative Notes
     if (elements.btnOpenNotes) elements.btnOpenNotes.addEventListener('click', openNotesModal);
@@ -4548,9 +4934,11 @@
     window.addEventListener('resize', () => {
       if (state.activeView === 'map') resizeAndDrawMap();
     });
+
+    initMentionsEngine();
   }
 
-  // --- 44. Bootstrap ---
+  // --- 48. Bootstrap ---
   async function init() {
     elements.profileNameInput.value = state.self.name;
     elements.selfIdTag.textContent = `ID: ${state.self.id}`;

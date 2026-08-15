@@ -141,6 +141,18 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="M9 14l2 2 4-4"/></svg>
           <span>Sync Notes</span>
         </button>
+        <button class="quick-act-btn" id="btn-open-timer" title="Synchronized Group Countdown Timer">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span>Group Timer</span>
+        </button>
+        <button class="quick-act-btn" id="btn-open-expenses" title="Group Expense Splitter & Tally">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          <span>Split Bills</span>
+        </button>
+        <button class="quick-act-btn" id="btn-toggle-red-mode" title="Tactical Night-Vision Red Light">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a7 7 0 0 0 0 14v4"/></svg>
+          <span>Red Vision</span>
+        </button>
         <button class="quick-act-btn" id="btn-open-network" title="Network Health & Ping Telemetry">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
           <span>Network HUD</span>
@@ -343,6 +355,9 @@
       </div>
 
       <div class="chat-input-container" id="chat-input-container">
+        <!-- @Mentions Suggestions Popup -->
+        <div class="mention-suggestions-popup" id="mention-suggestions-popup" style="display: none;"></div>
+
         <form class="input-form" id="chat-form">
           <input type="file" id="file-input" style="display: none;" accept="image/*,audio/*,application/pdf,text/*">
           
@@ -1272,6 +1287,76 @@
         <button class="btn btn-secondary" id="btn-snap-photo">📸 Capture</button>
         <button class="btn btn-primary" id="btn-send-snap" style="display: none;">Send Photo to Group</button>
       </div>
+    </div>
+  </div>
+
+  <!-- ⏱️ Synchronized Group Timer & Rendezvous Countdown Modal -->
+  <div class="modal-overlay" id="timer-modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">⏱️ Synchronized Group Timer</h3>
+          <p class="modal-subtitle">Syncs countdown live across all mesh devices</p>
+        </div>
+        <button class="close-btn" id="timer-modal-close-btn">&times;</button>
+      </div>
+
+      <div class="timer-display-box">
+        <div class="timer-digits" id="timer-digits-val">05:00</div>
+        <div class="timer-title-badge" id="timer-title-badge">Group Rendezvous</div>
+      </div>
+
+      <div class="timer-presets-row">
+        <button class="btn btn-secondary timer-preset-btn" data-sec="60">1 Min</button>
+        <button class="btn btn-secondary timer-preset-btn" data-sec="300">5 Mins</button>
+        <button class="btn btn-secondary timer-preset-btn" data-sec="900">15 Mins</button>
+        <button class="btn btn-secondary timer-preset-btn" data-sec="1500">25m Pomodoro</button>
+      </div>
+
+      <div class="timer-controls-row">
+        <button class="btn btn-primary" id="btn-start-sync-timer">Start Timer for All</button>
+        <button class="btn btn-secondary" id="btn-stop-sync-timer">Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 💰 Group Expense Splitter & Tally Calculator Modal -->
+  <div class="modal-overlay" id="expenses-modal-overlay">
+    <div class="modal-card expenses-modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">💰 Group Expense Splitter</h3>
+          <p class="modal-subtitle">Track shared bills & calculate settlements</p>
+        </div>
+        <button class="close-btn" id="expenses-modal-close-btn">&times;</button>
+      </div>
+
+      <div class="expense-add-box">
+        <div class="expense-inputs-grid">
+          <input type="text" class="text-input-field" id="expense-desc-input" placeholder="Item (e.g. Camp Food, Gas, Pizza)">
+          <input type="number" class="text-input-field" id="expense-amount-input" placeholder="Amount ($)" step="0.01">
+        </div>
+        <button class="btn btn-primary" id="btn-submit-add-expense" style="width:100%; margin-top:6px;">Add Expense</button>
+      </div>
+
+      <div class="expenses-summary-card">
+        <div class="exp-summary-row">
+          <span>Total Group Spend:</span>
+          <strong id="exp-total-spend">$0.00</strong>
+        </div>
+        <div class="exp-summary-row">
+          <span>Per Person Share:</span>
+          <strong id="exp-per-person">$0.00</strong>
+        </div>
+      </div>
+
+      <div class="expenses-list" id="expenses-list">
+        <div class="ptt-log-item empty">No expenses logged yet. Add your first shared item!</div>
+      </div>
+
+      <div class="settlement-box" id="settlement-box"></div>
+      
+      <button class="btn btn-secondary" id="btn-reset-expenses" style="width: 100%; margin-top: 8px; font-size: 11.5px;">Reset All Expenses</button>
     </div>
   </div>
 

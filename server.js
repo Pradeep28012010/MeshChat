@@ -99,6 +99,18 @@ let activeSharedNote = {
   updatedAt: Date.now()
 };
 
+// Synchronized Group Timer / Rendezvous Countdown
+let activeSharedTimer = {
+  title: "Group Countdown",
+  durationSec: 300,
+  startedAt: null,
+  isRunning: false,
+  senderName: "System"
+};
+
+// Shared Group Expense Tally Splitter
+let activeSharedExpenses = [];
+
 // Broadcast helper
 function broadcast(message, excludeWs = null) {
   const payload = JSON.stringify(message);
@@ -156,7 +168,9 @@ wss.on('connection', (ws, req) => {
             peers: getPeerList(),
             recentMessages: sessionMessages.slice(-50),
             serverAddresses: getLocalIPAddresses(),
-            sharedNote: activeSharedNote
+            sharedNote: activeSharedNote,
+            sharedTimer: activeSharedTimer,
+            sharedExpenses: activeSharedExpenses
           }));
 
           // Notify all other peers
@@ -368,6 +382,44 @@ wss.on('connection', (ws, req) => {
             clientTime: data.clientTime,
             serverTime: Date.now()
           }));
+          break;
+        }
+
+        // Synchronized Group Countdown & Rendezvous Timer
+        case 'TIMER_SYNC': {
+          activeSharedTimer = {
+            title: data.title || 'Group Timer',
+            durationSec: data.durationSec || 300,
+            startedAt: data.startedAt,
+            isRunning: !!data.isRunning,
+            senderName: data.senderName || 'Peer'
+          };
+
+          broadcast({
+            type: 'TIMER_SYNC',
+            timer: activeSharedTimer,
+            senderId: currentPeerId
+          }, ws);
+          break;
+        }
+
+        // Shared Group Expense Splitter
+        case 'EXPENSE_ADD': {
+          activeSharedExpenses.push(data.expense);
+          broadcast({
+            type: 'EXPENSE_ADD',
+            expense: data.expense,
+            expenses: activeSharedExpenses,
+            senderId: currentPeerId
+          }, ws);
+          break;
+        }
+
+        case 'EXPENSE_RESET': {
+          activeSharedExpenses = [];
+          broadcast({
+            type: 'EXPENSE_RESET'
+          }, ws);
           break;
         }
 
