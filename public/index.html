@@ -135,7 +135,19 @@
       <div class="sidebar-quick-actions">
         <button class="quick-act-btn" id="btn-start-rollcall" title="Team Roll Call">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>
-          <span>Safety Check-In</span>
+          <span>Safety Check</span>
+        </button>
+        <button class="quick-act-btn" id="btn-open-notes" title="Real-Time Collaborative Notes & Checklist">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="M9 14l2 2 4-4"/></svg>
+          <span>Sync Notes</span>
+        </button>
+        <button class="quick-act-btn" id="btn-open-network" title="Network Health & Ping Telemetry">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+          <span>Network HUD</span>
+        </button>
+        <button class="quick-act-btn" id="btn-open-camera" title="In-App Camera & Photo Editor">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          <span>Snap Photo</span>
         </button>
         <button class="quick-act-btn" id="btn-open-starred" title="Starred & Bookmarked Messages">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
@@ -1168,6 +1180,98 @@
       </div>
 
       <button class="btn btn-primary" style="width: 100%;" id="btn-submit-create-channel">Create Room</button>
+    </div>
+  </div>
+
+  <!-- 📋 Real-Time Collaborative Shared Notes & Checklist Modal -->
+  <div class="modal-overlay" id="notes-modal-overlay">
+    <div class="modal-card notes-modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">📋 Collaborative Sync Notes</h3>
+          <p class="modal-subtitle" id="notes-sync-status">Real-time group checklist • Syncs live across all peers</p>
+        </div>
+        <button class="close-btn" id="notes-modal-close-btn">&times;</button>
+      </div>
+
+      <div class="notes-editor-container">
+        <textarea class="notes-textarea" id="notes-textarea" placeholder="Type group packing lists, meeting notes, or ideas here..."></textarea>
+      </div>
+
+      <div class="notes-footer-row">
+        <span class="notes-author-badge" id="notes-author-badge">Last edited: You</span>
+        <button class="btn btn-primary" id="btn-broadcast-notes">Broadcast Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 📊 Network Diagnostics, Health & Ping Telemetry HUD Modal -->
+  <div class="modal-overlay" id="network-hud-modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">📊 Network & Ping Telemetry</h3>
+          <p class="modal-subtitle">Real-time local mesh signal diagnostics</p>
+        </div>
+        <button class="close-btn" id="network-hud-close-btn">&times;</button>
+      </div>
+
+      <div class="telemetry-grid">
+        <div class="telemetry-card">
+          <span class="telemetry-label">Round-Trip Latency</span>
+          <span class="telemetry-value" id="hud-ping-val">12 ms</span>
+        </div>
+        <div class="telemetry-card">
+          <span class="telemetry-label">Mesh Peers</span>
+          <span class="telemetry-value" id="hud-peers-val">1 Active</span>
+        </div>
+        <div class="telemetry-card">
+          <span class="telemetry-label">Packets Relayed</span>
+          <span class="telemetry-value" id="hud-packets-val">28 pkts</span>
+        </div>
+        <div class="telemetry-card">
+          <span class="telemetry-label">Bandwidth Saved</span>
+          <span class="telemetry-value" id="hud-bandwidth-val">100% Local</span>
+        </div>
+      </div>
+
+      <div class="network-topology-box">
+        <span class="ip-section-label">Active Mesh Star Topology:</span>
+        <div class="topology-diagram" id="topology-diagram">
+          <div class="topo-node central">Hub (Server)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 📸 In-App Snapshot Camera & Filter Editor Modal -->
+  <div class="modal-overlay" id="camera-modal-overlay">
+    <div class="modal-card camera-modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">📸 Snap Photo & Annotate</h3>
+          <p class="modal-subtitle">Take instant snapshot with real-time filters</p>
+        </div>
+        <button class="close-btn" id="camera-modal-close-btn">&times;</button>
+      </div>
+
+      <div class="camera-preview-box">
+        <video id="camera-live-video" autoplay playsinline style="width: 100%; border-radius: var(--radius-md);"></video>
+        <canvas id="camera-snap-canvas" style="display: none; width: 100%; border-radius: var(--radius-md);"></canvas>
+      </div>
+
+      <div class="camera-filters-row">
+        <button class="filter-chip active" data-filter="none">Normal</button>
+        <button class="filter-chip" data-filter="grayscale(100%)">B&W</button>
+        <button class="filter-chip" data-filter="sepia(90%)">Vintage</button>
+        <button class="filter-chip" data-filter="contrast(170%) brightness(120%)">High-Vis</button>
+        <button class="filter-chip" data-filter="hue-rotate(90deg)">Night-Vision</button>
+      </div>
+
+      <div class="camera-actions-row">
+        <button class="btn btn-secondary" id="btn-snap-photo">📸 Capture</button>
+        <button class="btn btn-primary" id="btn-send-snap" style="display: none;">Send Photo to Group</button>
+      </div>
     </div>
   </div>
 

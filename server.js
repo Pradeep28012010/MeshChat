@@ -92,6 +92,12 @@ app.get('/api/qr', async (req, res) => {
 const connectedPeers = new Map();
 // Message history in memory for current offline session (persisted on clients via IndexedDB)
 const sessionMessages = [];
+// Real-time collaborative shared notebook / packing checklist
+let activeSharedNote = {
+  content: "# 📋 Group Itinerary & Checklist\n\n- [x] Water bottles (2L per person)\n- [x] Portable power banks\n- [ ] First aid & blister kit\n- [ ] Trail maps & compass\n\n*Draft updates sync live across all mesh devices!*",
+  updatedBy: "System",
+  updatedAt: Date.now()
+};
 
 // Broadcast helper
 function broadcast(message, excludeWs = null) {
@@ -149,7 +155,8 @@ wss.on('connection', (ws, req) => {
             peerId: currentPeerId,
             peers: getPeerList(),
             recentMessages: sessionMessages.slice(-50),
-            serverAddresses: getLocalIPAddresses()
+            serverAddresses: getLocalIPAddresses(),
+            sharedNote: activeSharedNote
           }));
 
           // Notify all other peers
@@ -335,6 +342,32 @@ wss.on('connection', (ws, req) => {
             type: 'CHANNEL_CREATE',
             channel: data.channel
           });
+          break;
+        }
+
+        // Collaborative Shared Notebook Sync
+        case 'NOTE_UPDATE': {
+          activeSharedNote = {
+            content: data.noteContent,
+            updatedBy: data.updatedBy || 'User',
+            updatedAt: Date.now()
+          };
+
+          broadcast({
+            type: 'NOTE_UPDATE',
+            note: activeSharedNote,
+            senderId: currentPeerId
+          }, ws);
+          break;
+        }
+
+        // Live Round-Trip Ping Latency Telemetry
+        case 'PING': {
+          ws.send(JSON.stringify({
+            type: 'PONG',
+            clientTime: data.clientTime,
+            serverTime: Date.now()
+          }));
           break;
         }
 

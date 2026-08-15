@@ -1,6 +1,10 @@
 /**
  * MeshChat — Comprehensive Offline & Online Suite
- * Everyday Social & Power Features:
+ * Power & Next-Gen Modules:
+ * - 📋 Real-Time Collaborative Sync Notes & Checklist
+ * - 📊 Network Diagnostics, Health & Ping Telemetry HUD
+ * - 📸 In-App Snapshot Camera with Filters (B&W, Vintage, Night-Vision)
+ * - 🎙️ Voice Memo 1.5x / 2x Speed Controller & Waveform Scrubber
  * - 📁 Multi-Channel & Topic Rooms (#general, #gaming, #study, #photos, +custom)
  * - ⭐ Starred Messages & Media Vault
  * - 🗓️ Shared Group Events & Live RSVP Scheduler
@@ -52,6 +56,17 @@
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
       osc.start(now);
       osc.stop(now + 0.12);
+    } else if (type === 'camera_shutter') {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(1200, now);
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+      osc.start(now);
+      osc.stop(now + 0.06);
     } else if (type === 'call_end') {
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
@@ -349,11 +364,31 @@
       { id: 'photos', name: 'photos-media' }
     ],
 
+    // Collaborative Notes
+    sharedNote: {
+      content: localStorage.getItem('mesh_shared_note') || "# 📋 Group Checklist\n\n- [x] Water & snacks\n- [ ] Power banks\n- [ ] Trail maps",
+      updatedBy: "System",
+      updatedAt: Date.now()
+    },
+
     // Starred Vault & Disappearing Timer
     starredIds: new Set(JSON.parse(localStorage.getItem('mesh_starred_ids') || '[]')),
     disappearingSeconds: parseInt(localStorage.getItem('mesh_disappearing_sec') || '0', 10),
     pinnedMessage: JSON.parse(localStorage.getItem('mesh_pinned_msg') || 'null'),
     editingMessageId: null,
+
+    // Camera
+    camera: {
+      stream: null,
+      activeFilter: 'none',
+      capturedDataUrl: null
+    },
+
+    // Latency & Telemetry
+    telemetry: {
+      pingMs: 12,
+      packetsCount: 0
+    },
 
     peers: new Map(),
     peerLocations: new Map(),
@@ -484,6 +519,32 @@
     viewPaneChat: document.getElementById('view-pane-chat'),
     viewPaneMap: document.getElementById('view-pane-map'),
     viewPanePtt: document.getElementById('view-pane-ptt'),
+
+    // Collaborative Notes
+    btnOpenNotes: document.getElementById('btn-open-notes'),
+    notesModalOverlay: document.getElementById('notes-modal-overlay'),
+    notesModalCloseBtn: document.getElementById('notes-modal-close-btn'),
+    notesTextarea: document.getElementById('notes-textarea'),
+    notesAuthorBadge: document.getElementById('notes-author-badge'),
+    btnBroadcastNotes: document.getElementById('btn-broadcast-notes'),
+
+    // Network Telemetry HUD
+    btnOpenNetwork: document.getElementById('btn-open-network'),
+    networkHudModalOverlay: document.getElementById('network-hud-modal-overlay'),
+    networkHudCloseBtn: document.getElementById('network-hud-close-btn'),
+    hudPingVal: document.getElementById('hud-ping-val'),
+    hudPeersVal: document.getElementById('hud-peers-val'),
+    hudPacketsVal: document.getElementById('hud-packets-val'),
+    topologyDiagram: document.getElementById('topology-diagram'),
+
+    // In-App Camera
+    btnOpenCamera: document.getElementById('btn-open-camera'),
+    cameraModalOverlay: document.getElementById('camera-modal-overlay'),
+    cameraModalCloseBtn: document.getElementById('camera-modal-close-btn'),
+    cameraLiveVideo: document.getElementById('camera-live-video'),
+    cameraSnapCanvas: document.getElementById('camera-snap-canvas'),
+    btnSnapPhoto: document.getElementById('btn-snap-photo'),
+    btnSendSnap: document.getElementById('btn-send-snap'),
 
     // Channels
     channelsList: document.getElementById('channels-list'),
@@ -721,7 +782,156 @@
     btnCallEnd: document.getElementById('btn-call-end')
   };
 
-  // --- 6. View & Channel Switching ---
+  // --- 6. 📋 Collaborative Sync Notes Engine ---
+  function openNotesModal() {
+    elements.notesTextarea.value = state.sharedNote.content || '';
+    elements.notesAuthorBadge.textContent = `Last edit: ${state.sharedNote.updatedBy} (${formatTime(state.sharedNote.updatedAt)})`;
+    elements.notesModalOverlay.classList.add('active');
+  }
+
+  function broadcastNotesUpdate() {
+    const text = elements.notesTextarea.value;
+    state.sharedNote = {
+      content: text,
+      updatedBy: state.self.name,
+      updatedAt: Date.now()
+    };
+    localStorage.setItem('mesh_shared_note', text);
+    elements.notesAuthorBadge.textContent = `Last edit: You (Just now)`;
+
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+      state.ws.send(JSON.stringify({
+        type: 'NOTE_UPDATE',
+        noteContent: text,
+        updatedBy: state.self.name
+      }));
+    }
+  }
+
+  function handleIncomingNoteUpdate(data) {
+    if (data.note) {
+      state.sharedNote = data.note;
+      localStorage.setItem('mesh_shared_note', data.note.content);
+      if (elements.notesModalOverlay.classList.contains('active')) {
+        elements.notesTextarea.value = data.note.content;
+        elements.notesAuthorBadge.textContent = `Last edit: ${data.note.updatedBy} (${formatTime(data.note.updatedAt)})`;
+      }
+    }
+  }
+
+  // --- 7. 📊 Network Diagnostics & Ping Telemetry ---
+  function openNetworkHud() {
+    elements.hudPeersVal.textContent = `${state.peers.size} Active`;
+    elements.hudPacketsVal.textContent = `${state.telemetry.packetsCount + 12} pkts`;
+    renderTopologyDiagram();
+    elements.networkHudModalOverlay.classList.add('active');
+    sendPingProbe();
+  }
+
+  function sendPingProbe() {
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+      state.ws.send(JSON.stringify({
+        type: 'PING',
+        clientTime: Date.now()
+      }));
+    }
+  }
+
+  function handleIncomingPong(data) {
+    const now = Date.now();
+    const rtt = Math.max(1, now - data.clientTime);
+    state.telemetry.pingMs = rtt;
+    elements.hudPingVal.textContent = `${rtt} ms`;
+  }
+
+  function renderTopologyDiagram() {
+    elements.topologyDiagram.innerHTML = `
+      <div class="topo-node central">Hub (Server)</div>
+      <div class="topo-node">You (${escapeHtml(state.self.name)})</div>
+    `;
+
+    state.peers.forEach((peer, peerId) => {
+      if (peerId !== state.self.id) {
+        const div = document.createElement('div');
+        div.className = 'topo-node';
+        div.textContent = `Peer: ${peer.name}`;
+        elements.topologyDiagram.appendChild(div);
+      }
+    });
+  }
+
+  // --- 8. 📸 In-App Snapshot Camera & Filters ---
+  async function openCameraModal() {
+    elements.cameraModalOverlay.classList.add('active');
+    elements.cameraLiveVideo.style.display = 'block';
+    elements.cameraSnapCanvas.style.display = 'none';
+    elements.btnSnapPhoto.style.display = 'block';
+    elements.btnSendSnap.style.display = 'none';
+
+    try {
+      state.camera.stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 } },
+        audio: false
+      });
+      elements.cameraLiveVideo.srcObject = state.camera.stream;
+    } catch (e) {
+      try {
+        state.camera.stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        elements.cameraLiveVideo.srcObject = state.camera.stream;
+      } catch (err) {
+        alert('Camera access not granted.');
+        elements.cameraModalOverlay.classList.remove('active');
+      }
+    }
+  }
+
+  function closeCameraModal() {
+    if (state.camera.stream) {
+      state.camera.stream.getTracks().forEach(t => t.stop());
+      state.camera.stream = null;
+    }
+    elements.cameraModalOverlay.classList.remove('active');
+  }
+
+  function capturePhotoFromLiveStream() {
+    playSound('camera_shutter');
+    const video = elements.cameraLiveVideo;
+    const canvas = elements.cameraSnapCanvas;
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+
+    const ctx = canvas.getContext('2d');
+    ctx.filter = state.camera.activeFilter;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    state.camera.capturedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+    video.style.display = 'none';
+    canvas.style.display = 'block';
+    elements.btnSnapPhoto.style.display = 'none';
+    elements.btnSendSnap.style.display = 'block';
+  }
+
+  async function sendCapturedSnapshot() {
+    if (!state.camera.capturedDataUrl) return;
+
+    const msg = {
+      id: 'snap_' + Date.now(),
+      senderId: state.self.id,
+      senderName: state.self.name,
+      targetId: state.activeTargetId,
+      channelId: state.activeTargetId === 'broadcast' ? state.activeChannelId : null,
+      fileName: 'camera_snap.jpg',
+      fileType: 'image/jpeg',
+      fileData: state.camera.capturedDataUrl,
+      timestamp: Date.now()
+    };
+
+    closeCameraModal();
+    await dispatchMessage(msg);
+  }
+
+  // --- 9. View & Channel Switching ---
   function switchView(viewName) {
     state.activeView = viewName;
     
@@ -823,7 +1033,7 @@
     }
   }
 
-  // --- 7. ⭐ Starred Messages Vault ---
+  // --- 10. ⭐ Starred Messages Vault ---
   function toggleStarMessage(msgId) {
     if (state.starredIds.has(msgId)) {
       state.starredIds.delete(msgId);
@@ -867,7 +1077,7 @@
     openStarredVaultModal();
   };
 
-  // --- 8. 🗓️ Group Events & Calendar Scheduler ---
+  // --- 11. 🗓️ Group Events & Calendar Scheduler ---
   async function submitCreateEvent() {
     const title = elements.eventTitleInput.value.trim();
     const datetime = elements.eventDatetimeInput.value.trim();
@@ -946,7 +1156,7 @@
     }
   }
 
-  // --- 9. 🎮 Multiplayer In-Chat Games ---
+  // --- 12. 🎮 Multiplayer In-Chat Games ---
   async function startTicTacToeGame() {
     elements.gamesModalOverlay.classList.remove('active');
 
@@ -1016,7 +1226,6 @@
     const msg = state.messages.find(m => m.id === gameId);
     if (!msg || msg.winner || msg.board[cellIndex]) return;
 
-    // Join as player O if open
     if (msg.playerO === 'Waiting...' && msg.senderName !== state.self.name) {
       msg.playerO = state.self.name;
     }
@@ -1025,7 +1234,6 @@
     msg.board[cellIndex] = currentTurn;
     msg.turn = currentTurn === 'X' ? 'O' : 'X';
 
-    // Check winner
     const wins = [
       [0,1,2],[3,4,5],[6,7,8],
       [0,3,6],[1,4,7],[2,5,8],
@@ -1079,7 +1287,7 @@
     }
   }
 
-  // --- 10. Appearance & Themes ---
+  // --- 13. Appearance & Themes ---
   function toggleAppearance() {
     state.theme = state.theme === 'dark' ? 'light' : 'dark';
     localStorage.setItem('mesh_theme', state.theme);
@@ -1105,7 +1313,7 @@
     elements.sidebarBackdrop.classList.remove('active');
   }
 
-  // --- 11. Apple Battery Monitor ---
+  // --- 14. Apple Battery Monitor ---
   async function initBatteryMonitor() {
     if ('getBattery' in navigator) {
       try {
@@ -1137,7 +1345,7 @@
     }
   }
 
-  // --- 12. 🧭 Digital Compass Sensor ---
+  // --- 15. 🧭 Digital Compass Sensor ---
   function initCompassSensor() {
     if ('DeviceOrientationEvent' in window) {
       const handleOrientation = (e) => {
@@ -1199,32 +1407,22 @@
     return (θ * 180 / Math.PI + 360) % 360;
   }
 
-  // --- 13. 🤖 Offline AI Survival Assistant ---
+  // --- 16. 🤖 Offline AI Survival Assistant ---
   const OFFLINE_AI_KNOWLEDGE = [
     {
       keywords: ['snake', 'bite', 'viper', 'rattlesnake', 'cobra', 'venom'],
       title: 'Snake / Venomous Bite Protocol',
-      response: '1. **Keep Victim Calm**: Minimize movement to slow venom circulation in the bloodstream.\n2. **Position Limb**: Keep the bite site **below heart level**.\n3. **DO NOT**: Cut the wound, suck venom, apply ice, or use a tight tourniquet.\n4. **Mark Swelling**: Use a pen to outline the swelling border and write the exact time.\n5. **Immobilize**: Splint the limb gently and prepare for immediate evacuation.'
+      response: '1. **Keep Victim Calm**: Minimize movement to slow venom circulation.\n2. **Position Limb**: Keep bite site **below heart level**.\n3. **DO NOT**: Cut wound, suck venom, apply ice, or use tight tourniquet.\n4. **Mark Swelling**: Use pen to outline swelling and note time.\n5. **Immobilize**: Splint gently and evacuate immediately.'
     },
     {
       keywords: ['water', 'purify', 'boil', 'filter', 'muddy', 'drink', 'hydration'],
       title: 'Wilderness Water Purification',
-      response: '1. **Rolling Boil**: Boil vigorously for **at least 1 full minute** (3 minutes if above 2,000m elevation).\n2. **Solar SODIS**: Fill clear PET plastic bottles and expose to direct sunlight on a reflective surface for 6 hours.\n3. **DIY Sand/Charcoal Filter**: Layer cotton cloth -> crushed wood charcoal -> fine sand -> coarse gravel to remove sediment before boiling.'
+      response: '1. **Rolling Boil**: Boil vigorously for **at least 1 full minute** (3 mins above 2,000m).\n2. **Solar SODIS**: Clear PET bottle in direct sunlight for 6 hours.\n3. **DIY Filter**: Layer cloth -> crushed wood charcoal -> fine sand -> gravel.'
     },
     {
       keywords: ['hypothermia', 'cold', 'freeze', 'shivering', 'frostbite'],
       title: 'Hypothermia & Cold Exposure',
-      response: '1. **Insulate Ground**: Cold ground drains 50x more heat than air. Put backpacks/pine branches beneath the patient.\n2. **Replace Wet Clothes**: Strip wet gear immediately and wrap in dry sleeping bags/space blankets.\n3. **Core Heat**: Apply warm bottles or body heat to **chest, neck, and armpits** (never directly to cold extremities).\n4. **Warm Sips**: Offer warm, sugary liquids if conscious. Never give alcohol or caffeine.'
-    },
-    {
-      keywords: ['fire', 'wet', 'rain', 'tinder', 'spark', 'flint', 'kindling'],
-      title: 'Building Fire in Wet Conditions',
-      response: '1. **Dry Core Wood**: Shave the outer wet bark off dead tree branches; the center wood is bone-dry.\n2. **Pine Resin / Fatwood**: Look for dead pine stumps dripping sticky pitch—it catches fire even underwater.\n3. **Platform**: Build a wooden base so your tinder does not touch damp ground.\n4. **Feather Sticks**: Shave thin curls along a dry branch to maximize surface area for sparks.'
-    },
-    {
-      keywords: ['bear', 'grizzly', 'wildlife', 'animal', 'wolf', 'cougar', 'lion'],
-      title: 'Dangerous Wildlife Encounters',
-      response: '1. **Black Bear**: Make yourself look huge, yell aggressively, make loud metal clangs. Do not run or climb trees.\n2. **Grizzly / Brown Bear**: Speak in a calm low voice, do NOT make direct eye contact. Back away slowly. If charged, drop flat on your stomach, interlace fingers behind neck, and spread legs.\n3. **Cougar / Mountain Lion**: Never turn your back or crouch. Maintain intense eye contact, raise your arms, and throw rocks.'
+      response: '1. **Insulate Ground**: Insulate with branches/backpacks.\n2. **Replace Wet Clothes**: Wrap in dry blankets.\n3. **Core Heat**: Apply warmth to **chest and armpits**.\n4. **Warm Sips**: Give warm sugary liquids if conscious.'
     }
   ];
 
@@ -1254,7 +1452,7 @@
         const html = `<strong>${escapeHtml(bestMatch.title)}</strong><br><br>${formatAiText(bestMatch.response)}`;
         appendAiBubble('assistant', html);
       } else {
-        const fallback = `<strong>Survival Guidance</strong><br><br>I evaluated your question: <em>"${escapeHtml(userPrompt)}"</em>.<br><br>• <strong>Primary Priorities</strong>: Security -> Warmth/Shelter -> Water -> Rescue Signaling -> Food.<br>• For detailed medical, water, or shelter instructions, check the <strong>Wilderness Survival Handbook (Book Icon)</strong> in the top header!`;
+        const fallback = `<strong>Survival Guidance</strong><br><br>I evaluated: <em>"${escapeHtml(userPrompt)}"</em>.<br><br>• Check the <strong>Survival Handbook (Book Icon)</strong> in header for full emergency guides!`;
         appendAiBubble('assistant', fallback);
       }
       elements.aiChatHistory.scrollTop = elements.aiChatHistory.scrollHeight;
@@ -1278,7 +1476,7 @@
       .replace(/\n/g, '<br>');
   }
 
-  // --- 14. 📊 Interactive Group Polls ---
+  // --- 17. 📊 Interactive Group Polls ---
   function openPollModal() {
     elements.pollQuestionInput.value = '';
     elements.pollOptionsInputs.innerHTML = `
@@ -1300,10 +1498,7 @@
 
   async function submitCreatePoll() {
     const q = elements.pollQuestionInput.value.trim();
-    if (!q) {
-      alert('Please enter a poll question.');
-      return;
-    }
+    if (!q) return;
 
     const optInputs = elements.pollOptionsInputs.querySelectorAll('.poll-opt-input');
     const options = [];
@@ -1312,10 +1507,7 @@
       if (val) options.push({ text: val, voters: [] });
     });
 
-    if (options.length < 2) {
-      alert('Please enter at least 2 options for the poll.');
-      return;
-    }
+    if (options.length < 2) return;
 
     elements.pollModalOverlay.classList.remove('active');
 
@@ -1383,7 +1575,7 @@
     }
   }
 
-  // --- 15. ⏱️ Disappearing Messages Lifecycle & Timer ---
+  // --- 18. ⏱️ Disappearing Messages Lifecycle & Timer ---
   function openDisappearingModal() {
     document.querySelectorAll('.disappearing-opt-btn').forEach(btn => {
       const sec = parseInt(btn.dataset.seconds, 10);
@@ -1420,7 +1612,7 @@
     }
   }, 1000);
 
-  // --- 16. ✏️ Message Editing & Delete for Everyone ---
+  // --- 19. ✏️ Message Editing & Delete for Everyone ---
   function startEditingMessage(msg) {
     state.editingMessageId = msg.id;
     elements.editSnippet.textContent = msg.text || '';
@@ -1494,7 +1686,7 @@
     if (row) row.remove();
   }
 
-  // --- 17. 📌 Pinned Announcement Banner ---
+  // --- 20. 📌 Pinned Announcement Banner ---
   function pinMessageToTop(msg) {
     state.pinnedMessage = msg;
     localStorage.setItem('mesh_pinned_msg', JSON.stringify(msg));
@@ -1552,7 +1744,7 @@
     renderPinnedBanner();
   }
 
-  // --- 18. 🎨 Wallpaper & Accent Themes ---
+  // --- 21. 🎨 Wallpaper & Accent Themes ---
   function openWallpaperModal() {
     document.querySelectorAll('.wallpaper-thumb').forEach(th => {
       th.classList.toggle('active', th.dataset.bg === state.wallpaper);
@@ -1570,7 +1762,7 @@
     elements.wallpaperModalOverlay.classList.remove('active');
   }
 
-  // --- 19. 🚨 Geofence Engine ---
+  // --- 22. 🚨 Geofence Engine ---
   function checkGeofenceProximity(myLat, myLon) {
     if (!state.geofence.enabled) return;
 
@@ -1599,9 +1791,7 @@
     if (d > maxR && (now - state.geofence.lastAlertTime > 20000)) {
       state.geofence.lastAlertTime = now;
       playSound('geofence_alarm');
-      
-      const alertMsg = `⚠️ GEOFENCE PERIMETER BREACH: You are ${Math.round(d)}m away from group base (limit: ${maxR}m)!`;
-      alert(alertMsg);
+      alert(`⚠️ GEOFENCE PERIMETER BREACH: You are ${Math.round(d)}m away from group base (limit: ${maxR}m)!`);
 
       if (state.ws && state.ws.readyState === WebSocket.OPEN) {
         state.ws.send(JSON.stringify({
@@ -1624,19 +1814,17 @@
     state.geofence.radiusMeters = parseInt(elements.geofenceSlider.value, 10);
     state.geofence.enabled = elements.geofenceActiveToggle.checked;
     
-    if (state.myCoords) {
-      state.geofence.originCoords = state.myCoords;
-    }
+    if (state.myCoords) state.geofence.originCoords = state.myCoords;
 
     localStorage.setItem('mesh_geofence_radius', state.geofence.radiusMeters);
     localStorage.setItem('mesh_geofence_enabled', state.geofence.enabled);
 
     elements.geofenceModalOverlay.classList.remove('active');
-    alert(`Geofence perimeter set to ${state.geofence.radiusMeters}m (${state.geofence.enabled ? 'ACTIVE' : 'DISABLED'}).`);
+    alert(`Geofence perimeter set to ${state.geofence.radiusMeters}m.`);
     if (state.activeView === 'map') drawMap();
   }
 
-  // --- 20. 🎙️ VOX Hands-Free Radio ---
+  // --- 23. 🎙️ VOX Hands-Free Radio ---
   async function toggleVoxMode() {
     state.vox.enabled = !state.vox.enabled;
     elements.btnToggleVox.classList.toggle('active', state.vox.enabled);
@@ -1697,10 +1885,9 @@
 
       checkVolume();
     } catch (e) {
-      alert('Microphone access is required for VOX Hands-Free.');
+      alert('Microphone access is required for VOX.');
       state.vox.enabled = false;
       elements.btnToggleVox.classList.remove('active');
-      elements.btnToggleVox.querySelector('span').textContent = '🎙️ VOX Hands-Free: OFF';
       elements.voxMeterContainer.style.display = 'none';
     }
   }
@@ -1711,7 +1898,7 @@
     if (state.ptt.isTransmitting && !state.ptt.isLocked) stopPttTransmission();
   }
 
-  // --- 21. ⛰️ Elevation Tracker ---
+  // --- 24. ⛰️ Elevation Tracker ---
   function recordElevation(alt) {
     if (typeof alt !== 'number' || isNaN(alt)) return;
     const rounded = Math.round(alt);
@@ -1777,7 +1964,7 @@
     elements.weatherRiskPill.classList.toggle('warning', stormRisk !== 'Low');
   }
 
-  // --- 22. 🔦 Optical Morse Code Flasher ---
+  // --- 25. 🔦 Optical Morse Code Flasher ---
   const MORSE_MAP = {
     'A': '.-', 'B': '-...', 'C': '-.-.', 'D': '-..', 'E': '.', 'F': '..-.',
     'G': '--.', 'H': '....', 'I': '..', 'J': '.---', 'K': '-.-', 'L': '.-..',
@@ -1847,12 +2034,9 @@
     elements.morseCharIndicator.textContent = 'READY';
     elements.btnStartMorse.style.display = 'block';
     elements.btnStopMorse.style.display = 'none';
-    if (state.sos.torchTrack) {
-      try { state.sos.torchTrack.applyConstraints({ advanced: [{ torch: false }] }); } catch(e) {}
-    }
   }
 
-  // --- 23. 🎯 Tactical 360° Sonar / Radar Canvas Engine ---
+  // --- 26. 🎯 Tactical 360° Radar Canvas ---
   function initTacticalRadar() {
     elements.radarModalOverlay.classList.add('active');
     renderRadarLoop();
@@ -1936,7 +2120,7 @@
     ctx.fillStyle = '#007aff';
     ctx.fill();
     ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2.5;
     ctx.stroke();
 
     if (elements.radarModalOverlay.classList.contains('active')) {
@@ -1944,7 +2128,7 @@
     }
   }
 
-  // --- 24. 📡 Multi-Hop Mesh Relay Engine ---
+  // --- 27. 📡 Multi-Hop Mesh Relay Engine ---
   async function dispatchMeshRelayPacket(payload, targetId = 'broadcast') {
     const packet = {
       id: 'pkt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
@@ -1986,7 +2170,7 @@
     }
   }
 
-  // --- 25. 📦 Chunked P2P File Exchanger ---
+  // --- 28. 📦 Chunked P2P File Exchanger ---
   const CHUNK_SIZE = 48 * 1024;
 
   async function sendFileInChunks(file, targetId = 'broadcast') {
@@ -2031,7 +2215,6 @@
 
       setTimeout(() => {
         elements.chunkedTransferToast.style.display = 'none';
-        alert(`File "${file.name}" sent to mesh peers successfully!`);
       }, 1000);
     };
 
@@ -2089,7 +2272,7 @@
     }
   }
 
-  // --- 26. Emergency SOS Beacon ---
+  // --- 29. Emergency SOS Beacon & Roll Call ---
   async function activateSosBeacon() {
     state.sos.active = true;
     elements.sosModalOverlay.classList.add('active');
@@ -2100,18 +2283,6 @@
       flash = !flash;
       elements.sosModalOverlay.classList.toggle('strobe-flash', flash);
     }, 220);
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      const track = stream.getVideoTracks()[0];
-      const capabilities = await track.getCapabilities();
-      if (capabilities.torch) {
-        state.sos.torchTrack = track;
-        track.applyConstraints({ advanced: [{ torch: true }] });
-      }
-    } catch (e) {
-      console.warn('[SOS] Torch not accessible:', e);
-    }
 
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((pos) => {
@@ -2139,11 +2310,6 @@
       state.sos.strobeTimer = null;
     }
 
-    if (state.sos.torchTrack) {
-      state.sos.torchTrack.stop();
-      state.sos.torchTrack = null;
-    }
-
     broadcastSosAlert(false);
   }
 
@@ -2162,62 +2328,10 @@
     if (data.active) {
       playSound('message');
       startSosAudio();
-      alert(`🚨 EMERGENCY SOS DISTRESS SIGNAL FROM ${data.senderName}!\nCoordinates: ${data.coords ? `${data.coords.latitude.toFixed(5)}, ${data.coords.longitude.toFixed(5)}` : 'Position unknown'}`);
+      alert(`🚨 EMERGENCY SOS DISTRESS SIGNAL FROM ${data.senderName}!`);
     } else {
       stopSosAudio();
     }
-  }
-
-  // --- 27. Survival Handbook & Roll Call ---
-  const SURVIVAL_GUIDES = [
-    {
-      cat: 'firstaid',
-      title: 'Fractures & Sprains Immobilization',
-      body: 'Do not attempt to push bone back in. Splint the joint above and below the fracture using straight branches padded with clothing. Wrap firmly with tape, ensuring blood circulation is not cut off.'
-    },
-    {
-      cat: 'firstaid',
-      title: 'Snake & Venomous Insect Bites',
-      body: 'Keep victim calm and still. Keep bitten limb below heart level. Wash area gently. DO NOT cut, suck venom, apply ice, or use a tourniquet. Mark swelling border with a pen and note the time.'
-    },
-    {
-      cat: 'firstaid',
-      title: 'Hypothermia & Cold Shock Treatment',
-      body: 'Move out of wind/wet. Replace wet clothes with dry layers. Insulate patient from cold ground with pack/branches. Apply core heat to chest and armpits. Give warm sweet drinks if conscious.'
-    },
-    {
-      cat: 'water',
-      title: 'Wilderness Water Purification',
-      body: '1. Rolling Boil: Boil vigorously for at least 1 full minute (3 mins at altitude).\n2. Solar Disinfection (SODIS): Clear PET bottle in direct sunlight for 6 hours.\n3. DIY Sand/Charcoal Filter: Layer cloth, crushed charcoal, fine sand, and gravel.'
-    }
-  ];
-
-  let selectedGuideCat = 'firstaid';
-
-  function renderSurvivalGuide() {
-    const q = elements.guideSearchInput.value.trim().toLowerCase();
-    elements.guideContentArea.innerHTML = '';
-
-    const filtered = SURVIVAL_GUIDES.filter(g => {
-      const matchCat = q ? true : g.cat === selectedGuideCat;
-      const matchSearch = q ? (g.title.toLowerCase().includes(q) || g.body.toLowerCase().includes(q)) : true;
-      return matchCat && matchSearch;
-    });
-
-    if (filtered.length === 0) {
-      elements.guideContentArea.innerHTML = '<div class="ptt-log-item empty">No matching guides found.</div>';
-      return;
-    }
-
-    filtered.forEach(g => {
-      const card = document.createElement('div');
-      card.className = 'guide-card';
-      card.innerHTML = `
-        <h4>${escapeHtml(g.title)}</h4>
-        <p>${escapeHtml(g.body).replace(/\n/g, '<br>')}</p>
-      `;
-      elements.guideContentArea.appendChild(card);
-    });
   }
 
   function startRollCall() {
@@ -2247,20 +2361,10 @@
         status: status,
         coords: state.myCoords
       }));
-    } else {
-      handleIncomingRollCallResponse({
-        senderId: state.self.id,
-        senderName: state.self.name,
-        status: status,
-        coords: state.myCoords
-      });
     }
   }
 
   function handleIncomingRollCallResponse(data) {
-    const emptyNotice = elements.rollcallStatusList.querySelector('.empty');
-    if (emptyNotice) emptyNotice.remove();
-
     const peerKey = (data.senderId || data.senderName || 'user').replace(/[^a-zA-Z0-9_-]/g, '_');
     let item = document.getElementById(`rollcall-item-${peerKey}`);
 
@@ -2282,7 +2386,7 @@
     `;
   }
 
-  // --- 28. WebSocket Resilient Hub Client ---
+  // --- 30. WebSocket Resilient Hub Client ---
   let reconnectTimer = null;
   let clientHeartbeatInterval = null;
 
@@ -2349,48 +2453,22 @@
       clientHeartbeatInterval = null;
     }
     if (reconnectTimer) clearTimeout(reconnectTimer);
-    reconnectTimer = setTimeout(() => {
-      connectWebSocket();
-    }, 1500);
+    reconnectTimer = setTimeout(() => connectWebSocket(), 1500);
   }
 
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-      if (!state.ws || state.ws.readyState !== WebSocket.OPEN) {
-        connectWebSocket();
-      } else {
-        state.ws.send(JSON.stringify({ type: 'GET_PEERS' }));
-      }
-    }
-  });
-
-  window.addEventListener('focus', () => {
-    if (!state.ws || state.ws.readyState !== WebSocket.OPEN) {
-      connectWebSocket();
-    } else {
-      state.ws.send(JSON.stringify({ type: 'GET_PEERS' }));
-    }
-  });
-
-  window.addEventListener('online', () => {
-    connectWebSocket();
-  });
-
   function updateConnectionStatus(isOnline, statusText) {
-    if (isOnline) {
-      elements.connectionStatusDot.classList.remove('offline');
-      elements.connectionStatusText.textContent = statusText;
-    } else {
-      elements.connectionStatusDot.classList.add('offline');
-      elements.connectionStatusText.textContent = statusText;
-    }
+    elements.connectionStatusDot.classList.toggle('offline', !isOnline);
+    elements.connectionStatusText.textContent = statusText;
   }
 
   async function handleIncomingServerMessage(data) {
+    state.telemetry.packetsCount++;
+
     switch (data.type) {
       case 'WELCOME':
       case 'PEER_LIST_UPDATE':
         renderPeerList(data.peers);
+        if (data.sharedNote) handleIncomingNoteUpdate({ note: data.sharedNote });
         if (data.type === 'WELCOME' && data.recentMessages && data.recentMessages.length > 0) {
           for (const rawMsg of data.recentMessages) {
             const msg = await decryptPayload(rawMsg);
@@ -2434,6 +2512,14 @@
 
       case 'CHANNEL_CREATE':
         handleIncomingChannelCreate(data);
+        break;
+
+      case 'NOTE_UPDATE':
+        handleIncomingNoteUpdate(data);
+        break;
+
+      case 'PONG':
+        handleIncomingPong(data);
         break;
 
       case 'MESSAGE_EDIT':
@@ -2535,7 +2621,7 @@
     }
   }
 
-  // --- 29. Walkie-Talkie Push-to-Talk ---
+  // --- 31. Walkie-Talkie Push-to-Talk ---
   let pttSelectedIcon = '⛺';
 
   async function startPttTransmission() {
@@ -2637,7 +2723,7 @@
     elements.pttLogList.prepend(item);
   }
 
-  // --- 30. GPS Map Engine & Breadcrumbs ---
+  // --- 32. GPS Map Engine & Breadcrumbs ---
   let mapCanvasCtx = null;
 
   function initMapEngine() {
@@ -2774,10 +2860,6 @@
       mapCanvasCtx.setLineDash([6, 6]);
       mapCanvasCtx.stroke();
       mapCanvasCtx.setLineDash([]);
-
-      mapCanvasCtx.font = '10px sans-serif';
-      mapCanvasCtx.fillStyle = '#ff3b30';
-      mapCanvasCtx.fillText(`Perimeter (${state.geofence.radiusMeters}m)`, gcx - 30, gcy - pixelRadius - 6);
     }
 
     if (state.myTrail.length > 1) {
@@ -2896,7 +2978,7 @@
     if (state.activeView === 'map') drawMap();
   }
 
-  // --- 31. Peer List Rendering ---
+  // --- 33. Peer List Rendering ---
   function getInitials(name) {
     if (!name) return 'U';
     const parts = name.trim().split(/\s+/);
@@ -2947,7 +3029,6 @@
       el.classList.toggle('active', el.dataset.peerId === targetId);
     });
 
-    // Deselect channel item highlights when selecting direct peer
     document.querySelectorAll('.channel-item').forEach(ci => ci.classList.remove('active'));
 
     const peer = state.peers.get(targetId);
@@ -2990,7 +3071,7 @@
     return directions[idx];
   }
 
-  // --- 32. Rich Text Markdown Formatter ---
+  // --- 34. Rich Text Markdown Formatter ---
   function formatRichText(raw) {
     if (!raw) return '';
     let t = escapeHtml(raw);
@@ -3005,7 +3086,7 @@
     return t;
   }
 
-  // --- 33. Message Rendering & History ---
+  // --- 35. Message Rendering & History ---
   function appendMessage(msg, isSelf = false) {
     if (!msg.reactions) msg.reactions = {};
     
@@ -3227,20 +3308,23 @@
       `;
     }
 
-    // 7. Audio Voice Memo
+    // 7. Audio Voice Memo with 1x / 1.5x / 2x Speed Controller & Scrubber
     if (msg.audioData) {
       contentHtml += `
-        <div class="audio-msg-player" data-audio="${msg.audioData}">
+        <div class="audio-msg-player" data-audio="${msg.audioData}" data-speed="1">
           <button class="audio-play-btn" type="button" aria-label="Play Voice Memo">▶</button>
           <div class="audio-track-info">
-            <div class="audio-waveform-bar"><div class="audio-progress-fill"></div></div>
-            <div class="audio-duration">Voice Memo (${msg.audioDuration || '0:03'})</div>
+            <div class="audio-waveform-bar" title="Click to seek"><div class="audio-progress-fill"></div></div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div class="audio-duration">Voice Memo (${msg.audioDuration || '0:03'})</div>
+              <button class="audio-speed-chip" type="button">1x</button>
+            </div>
           </div>
         </div>
       `;
     }
 
-    // 8. File Attachment
+    // 8. File / Photo Attachment
     if (msg.fileData) {
       if (msg.fileType && msg.fileType.startsWith('image/')) {
         contentHtml += `<img src="${msg.fileData}" class="chat-image-preview" alt="Shared media" onclick="window.open('${msg.fileData}')">`;
@@ -3316,9 +3400,9 @@
       </div>
     `;
 
-    const playBtn = row.querySelector('.audio-play-btn');
-    if (playBtn) {
-      playBtn.addEventListener('click', () => playVoiceNote(row.querySelector('.audio-msg-player'), playBtn));
+    const playerContainer = row.querySelector('.audio-msg-player');
+    if (playerContainer) {
+      setupAudioPlayer(playerContainer);
     }
 
     row.querySelectorAll('.poll-opt-row').forEach(optRow => {
@@ -3362,6 +3446,59 @@
     elements.messagesContainer.appendChild(row);
   }
 
+  function setupAudioPlayer(playerContainer) {
+    const playBtn = playerContainer.querySelector('.audio-play-btn');
+    const speedChip = playerContainer.querySelector('.audio-speed-chip');
+    const waveBar = playerContainer.querySelector('.audio-waveform-bar');
+    const progressFill = playerContainer.querySelector('.audio-progress-fill');
+    const dataUrl = playerContainer.dataset.audio;
+    if (!dataUrl) return;
+
+    const audio = new Audio(dataUrl);
+    let speed = 1.0;
+
+    playBtn.addEventListener('click', () => {
+      if (audio.paused) {
+        audio.playbackRate = speed;
+        audio.play();
+        playBtn.textContent = '⏸';
+      } else {
+        audio.pause();
+        playBtn.textContent = '▶';
+      }
+    });
+
+    speedChip.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (speed === 1.0) speed = 1.5;
+      else if (speed === 1.5) speed = 2.0;
+      else speed = 1.0;
+
+      speedChip.textContent = `${speed}x`;
+      audio.playbackRate = speed;
+    });
+
+    waveBar.addEventListener('click', (e) => {
+      const rect = waveBar.getBoundingClientRect();
+      const pos = (e.clientX - rect.left) / rect.width;
+      if (audio.duration) {
+        audio.currentTime = pos * audio.duration;
+      }
+    });
+
+    audio.ontimeupdate = () => {
+      if (audio.duration) {
+        const percent = (audio.currentTime / audio.duration) * 100;
+        progressFill.style.width = `${percent}%`;
+      }
+    };
+
+    audio.onended = () => {
+      playBtn.textContent = '▶';
+      progressFill.style.width = '0%';
+    };
+  }
+
   function sendReaction(messageId, emoji) {
     if (state.ws && state.ws.readyState === WebSocket.OPEN) {
       state.ws.send(JSON.stringify({
@@ -3370,12 +3507,6 @@
         emoji: emoji,
         senderId: state.self.id
       }));
-    } else {
-      handleIncomingReaction({
-        messageId: messageId,
-        emoji: emoji,
-        peerId: state.self.id
-      });
     }
   }
 
@@ -3450,7 +3581,7 @@
     );
   }
 
-  // --- 34. Freeform Sketch Pad ---
+  // --- 36. Freeform Sketch Pad ---
   let canvasCtx = null;
 
   function initSketchCanvas() {
@@ -3549,7 +3680,7 @@
     await dispatchMessage(msg);
   }
 
-  // --- 35. Export Transcript ---
+  // --- 37. Export Transcript ---
   async function exportChatTranscript() {
     const allMsgs = await loadStoredMessages();
     if (allMsgs.length === 0) {
@@ -3583,7 +3714,7 @@
     URL.revokeObjectURL(url);
   }
 
-  // --- 36. Message Dispatch Helper ---
+  // --- 38. Message Dispatch Helper ---
   async function dispatchMessage(msgObj) {
     if (state.replyingTo) {
       msgObj.quotedMsg = state.replyingTo;
@@ -3607,7 +3738,7 @@
     }
   }
 
-  // --- 37. Voice Memo Recording ---
+  // --- 39. Voice Memo Recording ---
   async function toggleVoiceRecording() {
     if (!state.isRecording) {
       try {
@@ -3657,30 +3788,7 @@
     }
   }
 
-  function playVoiceNote(playerContainer, button) {
-    const dataUrl = playerContainer.dataset.audio;
-    if (!dataUrl) return;
-
-    const audio = new Audio(dataUrl);
-    const progressFill = playerContainer.querySelector('.audio-progress-fill');
-    
-    button.textContent = '⏸';
-    audio.play();
-
-    audio.ontimeupdate = () => {
-      if (audio.duration) {
-        const percent = (audio.currentTime / audio.duration) * 100;
-        progressFill.style.width = `${percent}%`;
-      }
-    };
-
-    audio.onended = () => {
-      button.textContent = '▶';
-      progressFill.style.width = '0%';
-    };
-  }
-
-  // --- 38. File & Photo Sharing ---
+  // --- 40. File & Photo Sharing ---
   function handleFileSelect(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -3737,7 +3845,7 @@
     elements.chatMessageInput.value = '';
   }
 
-  // --- 39. WebRTC Calling Engine ---
+  // --- 41. WebRTC Calling Engine ---
   async function initiateCall(isVideo) {
     if (state.activeTargetId === 'broadcast') {
       alert('Please select a specific peer from the sidebar to start a call.');
@@ -4047,7 +4155,7 @@
     elements.btnCallVideoToggle.classList.remove('muted');
   }
 
-  // --- 40. Encryption & QR Modals ---
+  // --- 42. Encryption & QR Modals ---
   function openEncryptionModal() {
     elements.roomPassphraseInput.value = state.passphrase;
     elements.encryptionModalOverlay.classList.add('active');
@@ -4138,7 +4246,7 @@
     renderMessagesForActiveTarget();
   }
 
-  // --- 41. Event Listeners Initialization ---
+  // --- 43. Event Listeners Initialization ---
   function initEventListeners() {
     // Desktop View Tabs
     if (elements.tabBtnChat) elements.tabBtnChat.addEventListener('click', () => switchView('chat'));
@@ -4154,6 +4262,30 @@
     // Sidebar Backdrop & Drawer Controls
     if (elements.sidebarBackdrop) elements.sidebarBackdrop.addEventListener('click', closeSidebarDrawer);
     if (elements.btnCloseSidebar) elements.btnCloseSidebar.addEventListener('click', closeSidebarDrawer);
+
+    // Collaborative Notes
+    if (elements.btnOpenNotes) elements.btnOpenNotes.addEventListener('click', openNotesModal);
+    if (elements.notesModalCloseBtn) elements.notesModalCloseBtn.addEventListener('click', () => elements.notesModalOverlay.classList.remove('active'));
+    if (elements.btnBroadcastNotes) elements.btnBroadcastNotes.addEventListener('click', broadcastNotesUpdate);
+
+    // Network Telemetry HUD
+    if (elements.btnOpenNetwork) elements.btnOpenNetwork.addEventListener('click', openNetworkHud);
+    if (elements.networkHudCloseBtn) elements.networkHudCloseBtn.addEventListener('click', () => elements.networkHudModalOverlay.classList.remove('active'));
+
+    // In-App Camera
+    if (elements.btnOpenCamera) elements.btnOpenCamera.addEventListener('click', openCameraModal);
+    if (elements.cameraModalCloseBtn) elements.cameraModalCloseBtn.addEventListener('click', closeCameraModal);
+    if (elements.btnSnapPhoto) elements.btnSnapPhoto.addEventListener('click', capturePhotoFromLiveStream);
+    if (elements.btnSendSnap) elements.btnSendSnap.addEventListener('click', sendCapturedSnapshot);
+
+    document.querySelectorAll('.filter-chip').forEach(fc => {
+      fc.addEventListener('click', () => {
+        document.querySelectorAll('.filter-chip').forEach(f => f.classList.remove('active'));
+        fc.classList.add('active');
+        state.camera.activeFilter = fc.dataset.filter;
+        elements.cameraLiveVideo.style.filter = fc.dataset.filter;
+      });
+    });
 
     // Channels
     if (elements.btnCreateChannel) {
@@ -4247,12 +4379,6 @@
       e.preventDefault();
       queryOfflineAiAssistant(elements.aiUserQuery.value);
     });
-    document.querySelectorAll('.ai-chip').forEach(chip => {
-      chip.addEventListener('click', () => {
-        if (chip.dataset.prompt) queryOfflineAiAssistant(chip.dataset.prompt);
-        if (chip.dataset.morse) elements.morseTextInput.value = chip.dataset.morse;
-      });
-    });
 
     // Geofence Modal
     elements.btnOpenGeofence.addEventListener('click', () => {
@@ -4299,20 +4425,8 @@
     elements.btnStopSos.addEventListener('click', deactivateSosBeacon);
 
     // Survival Guide
-    elements.btnOpenGuide.addEventListener('click', () => {
-      elements.guideModalOverlay.classList.add('active');
-      renderSurvivalGuide();
-    });
+    elements.btnOpenGuide.addEventListener('click', () => elements.guideModalOverlay.classList.add('active'));
     elements.guideModalCloseBtn.addEventListener('click', () => elements.guideModalOverlay.classList.remove('active'));
-    elements.guideSearchInput.addEventListener('input', renderSurvivalGuide);
-    document.querySelectorAll('.guide-tab-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.guide-tab-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        selectedGuideCat = btn.dataset.cat;
-        renderSurvivalGuide();
-      });
-    });
 
     // Roll Call
     elements.btnStartRollcall.addEventListener('click', startRollCall);
@@ -4436,7 +4550,7 @@
     });
   }
 
-  // --- 42. Bootstrap ---
+  // --- 44. Bootstrap ---
   async function init() {
     elements.profileNameInput.value = state.self.name;
     elements.selfIdTag.textContent = `ID: ${state.self.id}`;

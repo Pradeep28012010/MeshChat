@@ -3439,6 +3439,165 @@ body.dark-theme .msg-text code { background: rgba(255, 255, 255, 0.15); }
   margin-top: 2px;
 }
 
+/* ==========================================================
+   📋 COLLABORATIVE SYNC NOTES & CHECKLIST
+   ========================================================== */
+.notes-modal-card {
+  max-width: 480px;
+}
+
+.notes-editor-container {
+  margin: 10px 0;
+}
+
+.notes-textarea {
+  width: 100%;
+  height: 240px;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-divider);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  resize: vertical;
+  outline: none;
+}
+
+.notes-textarea:focus {
+  border-color: var(--accent-blue);
+}
+
+.notes-footer-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.notes-author-badge {
+  font-size: 11.5px;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+}
+
+/* ==========================================================
+   📊 NETWORK DIAGNOSTICS & TELEMETRY HUD
+   ========================================================== */
+.telemetry-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.telemetry-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-divider);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.telemetry-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.telemetry-value {
+  font-size: 18px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: #34c759;
+  margin-top: 4px;
+}
+
+.topology-diagram {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-divider);
+  border-radius: var(--radius-md);
+  margin-top: 6px;
+}
+
+.topo-node {
+  font-size: 11.5px;
+  font-family: var(--font-mono);
+  padding: 4px 8px;
+  background: rgba(0, 122, 255, 0.1);
+  border: 1px solid var(--accent-blue);
+  color: var(--accent-blue);
+  border-radius: var(--radius-full);
+}
+
+.topo-node.central {
+  background: var(--accent-blue);
+  color: #ffffff;
+}
+
+/* ==========================================================
+   📸 IN-APP SNAPSHOT CAMERA & FILTERS
+   ========================================================== */
+.camera-preview-box {
+  background: #000000;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-bottom: 10px;
+  position: relative;
+  min-height: 220px;
+}
+
+.camera-filters-row {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  margin-bottom: 12px;
+}
+
+.filter-chip {
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-divider);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 11.5px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--trans-fast);
+}
+
+.filter-chip.active {
+  border-color: var(--accent-blue);
+  background: var(--accent-blue-tint);
+  color: var(--accent-blue);
+}
+
+.camera-actions-row {
+  display: flex;
+  gap: 8px;
+}
+
+/* Voice Memo 1.5x / 2x Speed Controller */
+.audio-speed-chip {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  background: rgba(0, 122, 255, 0.15);
+  color: var(--accent-blue);
+  border: none;
+  border-radius: 4px;
+  padding: 1px 5px;
+  cursor: pointer;
+  margin-left: 6px;
+}
+
+
 
 
 
