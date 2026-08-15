@@ -1,21 +1,22 @@
 /**
- * MeshChat — Zero-Internet Messaging, Calling, GPS Map, Walkie-Talkie & Wilderness Survival Suite
- * Next-Gen Modules:
- * - 🧭 360° Digital Compass & Peer Direction HUD
- * - 🤖 100% Offline AI Survival Assistant (Neural Pattern Reasoner)
- * - 🚨 Geofence Perimeter & "Lost Hiker" Proximity Alarm
- * - 🎙️ VOX Hands-Free Voice-Activated Walkie-Talkie
- * - ⛰️ Elevation Profile & Storm Risk Predictor
- * - 📡 Multi-Hop Mesh Packet Relay Engine
- * - 🔦 Optical Morse Code Screen & Torch Strobe Flasher
- * - 🎯 Tactical 360° Sonar / Radar HUD View
- * - 📦 Chunked P2P File Exchanger & Map Exchanger
+ * MeshChat — Zero-Internet Messaging, Calling, GPS Map, Walkie-Talkie & Survival Suite
+ * Consumer Features:
+ * - 📊 Interactive Live Polls & Group Voting
+ * - ⏱️ Disappearing Self-Destructing Messages
+ * - ✏️ Message Editing & Delete for Everyone
+ * - 📌 Pinned Announcement Banner
+ * - 🎨 Chat Wallpaper & Theme Color Customizer
+ * - 📝 Markdown & Rich Text Formatting
+ * - 📡 Multi-Hop Mesh Relay
+ * - 🔦 Optical Morse Code Flasher
+ * - 🎯 Tactical 360° Radar HUD
+ * - 📦 Chunked File Exchanger
  */
 
 (function () {
   'use strict';
 
-  // --- 1. Sound Synthesizer (Web Audio API - Cues, Ringtone, Squelch, Morse & Alarms) ---
+  // --- 1. Sound Synthesizer (Web Audio API) ---
   const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   
   function playSound(type) {
@@ -86,7 +87,6 @@
     }
   }
 
-  // Play short audio beep for Morse code
   function playMorseBeep(durationMs) {
     if (audioCtx.state === 'suspended') audioCtx.resume();
     const now = audioCtx.currentTime;
@@ -102,7 +102,7 @@
     osc.stop(now + durationMs / 1000);
   }
 
-  // SOS Morse Code Siren Loop (... --- ...)
+  // SOS Siren
   let sosAudioInterval = null;
   function startSosAudio() {
     stopSosAudio();
@@ -248,9 +248,9 @@
     }
   }
 
-  // --- 3. IndexedDB Local Storage ---
+  // --- 3. IndexedDB Storage ---
   const DB_NAME = 'MeshChatLocalDB';
-  const DB_VERSION = 3;
+  const DB_VERSION = 4;
   let db = null;
 
   function initDatabase() {
@@ -259,7 +259,7 @@
       request.onupgradeneeded = (e) => {
         const database = e.target.result;
         if (!database.objectStoreNames.contains('messages')) {
-          database.createStore = database.createObjectStore('messages', { keyPath: 'id' });
+          database.createObjectStore('messages', { keyPath: 'id' });
         }
       };
       request.onsuccess = (e) => {
@@ -278,6 +278,17 @@
       store.put(msg);
     } catch (e) {
       console.error('[Storage] Save error:', e);
+    }
+  }
+
+  async function deleteMessageFromStorage(msgId) {
+    if (!db) return;
+    try {
+      const tx = db.transaction('messages', 'readwrite');
+      const store = tx.objectStore('messages');
+      store.delete(msgId);
+    } catch (e) {
+      console.error('[Storage] Delete error:', e);
     }
   }
 
@@ -306,9 +317,14 @@
       name: localStorage.getItem('mesh_peer_name') || 'User_' + Math.floor(100 + Math.random() * 900)
     },
     theme: localStorage.getItem('mesh_theme') || 'light',
+    wallpaper: localStorage.getItem('mesh_wallpaper') || 'default',
+    accentColor: localStorage.getItem('mesh_accent_color') || '#007aff',
     activeView: 'chat',
     passphrase: localStorage.getItem('mesh_passphrase') || 'mesh-default-key',
     activeTargetId: 'broadcast',
+    disappearingSeconds: parseInt(localStorage.getItem('mesh_disappearing_sec') || '0', 10),
+    pinnedMessage: JSON.parse(localStorage.getItem('mesh_pinned_msg') || 'null'),
+    editingMessageId: null,
     peers: new Map(),
     peerLocations: new Map(),
     peerBatteries: new Map(),
@@ -328,7 +344,7 @@
     audioChunks: [],
     seenRelayPackets: new Set(),
     
-    // Geofence Perimeter
+    // Geofence
     geofence: {
       enabled: localStorage.getItem('mesh_geofence_enabled') === 'true',
       radiusMeters: parseInt(localStorage.getItem('mesh_geofence_radius') || '250', 10),
@@ -336,7 +352,7 @@
       lastAlertTime: 0
     },
 
-    // VOX Hands-Free Radio
+    // VOX
     vox: {
       enabled: false,
       threshold: 0.18,
@@ -346,32 +362,32 @@
       animFrame: null
     },
 
-    // Optical Morse Strobe
+    // Morse
     morse: {
       isPlaying: false,
       timer: null
     },
 
-    // Tactical Radar
+    // Radar
     radar: {
       animFrame: null,
       sweepAngle: 0
     },
 
-    // Chunked File Transfer
+    // Chunked Transfer
     chunkedTransfer: {
       active: false,
-      buffers: new Map() // transferId -> { chunks: [], totalChunks, fileName, fileSize }
+      buffers: new Map()
     },
 
-    // SOS Beacon
+    // SOS
     sos: {
       active: false,
       strobeTimer: null,
       torchTrack: null
     },
 
-    // Walkie Talkie (PTT)
+    // PTT
     ptt: {
       isTransmitting: false,
       isLocked: false,
@@ -397,7 +413,7 @@
       incomingData: null
     },
 
-    // Sketch Canvas
+    // Sketch
     sketch: {
       isDrawing: false,
       color: '#000000',
@@ -439,6 +455,33 @@
     viewPaneMap: document.getElementById('view-pane-map'),
     viewPanePtt: document.getElementById('view-pane-ptt'),
 
+    // Consumer Modals & Controls
+    btnToggleDisappearing: document.getElementById('btn-toggle-disappearing'),
+    disappearingBadge: document.getElementById('disappearing-badge'),
+    disappearingModalOverlay: document.getElementById('disappearing-modal-overlay'),
+    disappearingModalCloseBtn: document.getElementById('disappearing-modal-close-btn'),
+
+    btnOpenWallpapers: document.getElementById('btn-open-wallpapers'),
+    wallpaperModalOverlay: document.getElementById('wallpaper-modal-overlay'),
+    wallpaperModalCloseBtn: document.getElementById('wallpaper-modal-close-btn'),
+    btnSaveWallpaper: document.getElementById('btn-save-wallpaper'),
+
+    btnCreatePoll: document.getElementById('btn-create-poll'),
+    pollModalOverlay: document.getElementById('poll-modal-overlay'),
+    pollModalCloseBtn: document.getElementById('poll-modal-close-btn'),
+    pollQuestionInput: document.getElementById('poll-question-input'),
+    pollOptionsInputs: document.getElementById('poll-options-inputs'),
+    btnAddPollOption: document.getElementById('btn-add-poll-option'),
+    btnSubmitCreatePoll: document.getElementById('btn-submit-create-poll'),
+
+    pinnedMessageBanner: document.getElementById('pinned-message-banner'),
+    pinnedSnippet: document.getElementById('pinned-snippet'),
+    btnUnpin: document.getElementById('btn-unpin'),
+
+    editBar: document.getElementById('edit-bar'),
+    editSnippet: document.getElementById('edit-snippet'),
+    btnCancelEdit: document.getElementById('btn-cancel-edit'),
+
     // AI Survival Assistant
     btnOpenAi: document.getElementById('btn-open-ai'),
     aiModalOverlay: document.getElementById('ai-modal-overlay'),
@@ -456,7 +499,7 @@
     geofenceActiveToggle: document.getElementById('geofence-active-toggle'),
     btnSaveGeofence: document.getElementById('btn-save-geofence'),
 
-    // Optical Morse Strobe
+    // Optical Morse
     btnOpenMorse: document.getElementById('btn-open-morse'),
     morseModalOverlay: document.getElementById('morse-modal-overlay'),
     morseModalCloseBtn: document.getElementById('morse-modal-close-btn'),
@@ -480,7 +523,7 @@
     transferProgressFill: document.getElementById('transfer-progress-fill'),
     transferToastSub: document.getElementById('transfer-toast-sub'),
 
-    // SOS & Survival
+    // SOS & Guide
     btnSosBeacon: document.getElementById('btn-sos-beacon'),
     sosModalOverlay: document.getElementById('sos-modal-overlay'),
     sosCoordsBox: document.getElementById('sos-coords-box'),
@@ -644,6 +687,14 @@
     if (state.activeView === 'map') resizeAndDrawMap();
   }
 
+  function applyCustomTheme() {
+    elements.messagesContainer.classList.remove('bg-slate', 'bg-emerald', 'bg-sunset');
+    if (state.wallpaper !== 'default') {
+      elements.messagesContainer.classList.add(`bg-${state.wallpaper}`);
+    }
+    document.documentElement.style.setProperty('--accent-blue', state.accentColor);
+  }
+
   function openSidebarDrawer() {
     elements.sidebar.classList.add('open');
     elements.sidebarBackdrop.classList.add('active');
@@ -654,7 +705,7 @@
     elements.sidebarBackdrop.classList.remove('active');
   }
 
-  // --- 7. Apple-Style Battery Capsule Widget ---
+  // --- 7. Apple Battery Monitor ---
   async function initBatteryMonitor() {
     if ('getBattery' in navigator) {
       try {
@@ -686,7 +737,7 @@
     }
   }
 
-  // --- 8. 🧭 360° Digital Compass & Peer Direction Guidance ---
+  // --- 8. 🧭 Digital Compass Sensor ---
   function initCompassSensor() {
     if ('DeviceOrientationEvent' in window) {
       const handleOrientation = (e) => {
@@ -722,7 +773,6 @@
 
     elements.mapCompassHeading.textContent = `${String(deg).padStart(3, '0')}° ${cardinal}`;
 
-    // Target Peer Guidance Radar
     if (state.activeTargetId && state.activeTargetId !== 'broadcast' && state.myCoords) {
       const targetLoc = state.peerLocations.get(state.activeTargetId);
       if (targetLoc && targetLoc.coords) {
@@ -749,7 +799,7 @@
     return (θ * 180 / Math.PI + 360) % 360;
   }
 
-  // --- 9. 🤖 100% Offline AI Survival Assistant ---
+  // --- 9. 🤖 Offline AI Survival Assistant ---
   const OFFLINE_AI_KNOWLEDGE = [
     {
       keywords: ['snake', 'bite', 'viper', 'rattlesnake', 'cobra', 'venom'],
@@ -780,11 +830,6 @@
       keywords: ['plant', 'edible', 'food', 'eat', 'berry', 'berries', 'mushroom'],
       title: 'Wild Foraging & Universal Edibility Test',
       response: '1. **Golden Rule**: Never eat wild mushrooms or white/yellow berries in survival scenarios.\n2. **Safe Plants**: Pine needles (steep in hot water for Vitamin C), young Dandelion leaves, Cattail roots (boil or roast), inner pine bark (cambium layer).\n3. **Edibility Test**: Rub plant on inner wrist -> wait 8 hrs -> touch to outer lip -> wait 8 hrs -> chew small bite without swallowing. If no burning/nausea, it is safer.'
-    },
-    {
-      keywords: ['shelter', 'debris', 'snow', 'bivouac', 'wind', 'tarp'],
-      title: 'Emergency Survival Shelters',
-      response: '1. **Debris Hut**: Lean a 3-meter ridgepole against a sturdy tree stump at 45°. Layer ribs across sides, then pile 2–3 feet of dry leaves and pine needles for insulation.\n2. **Snow Trench**: Dig a trench 1 meter deep in snow, lay branches and tarp across the top, and shovel snow over it.\n3. **Orientation**: Always face the entrance 90° away from prevailing winds.'
     }
   ];
 
@@ -838,7 +883,304 @@
       .replace(/\n/g, '<br>');
   }
 
-  // --- 10. 🚨 Geofencing & Lost Hiker Proximity Alarm ---
+  // --- 10. 📊 Interactive Group Polls ---
+  function openPollModal() {
+    elements.pollQuestionInput.value = '';
+    elements.pollOptionsInputs.innerHTML = `
+      <input type="text" class="text-input-field poll-opt-input" placeholder="Option 1" style="margin-bottom: 6px;">
+      <input type="text" class="text-input-field poll-opt-input" placeholder="Option 2" style="margin-bottom: 6px;">
+    `;
+    elements.pollModalOverlay.classList.add('active');
+  }
+
+  function addPollOptionInput() {
+    const count = elements.pollOptionsInputs.querySelectorAll('.poll-opt-input').length + 1;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'text-input-field poll-opt-input';
+    input.placeholder = `Option ${count}`;
+    input.style.marginBottom = '6px';
+    elements.pollOptionsInputs.appendChild(input);
+  }
+
+  async function submitCreatePoll() {
+    const q = elements.pollQuestionInput.value.trim();
+    if (!q) {
+      alert('Please enter a poll question.');
+      return;
+    }
+
+    const optInputs = elements.pollOptionsInputs.querySelectorAll('.poll-opt-input');
+    const options = [];
+    optInputs.forEach(inp => {
+      const val = inp.value.trim();
+      if (val) options.push({ text: val, voters: [] });
+    });
+
+    if (options.length < 2) {
+      alert('Please enter at least 2 options for the poll.');
+      return;
+    }
+
+    elements.pollModalOverlay.classList.remove('active');
+
+    const pollMsg = {
+      id: 'poll_' + Date.now(),
+      type: 'poll',
+      senderId: state.self.id,
+      senderName: state.self.name,
+      targetId: state.activeTargetId,
+      question: q,
+      options: options,
+      timestamp: Date.now()
+    };
+
+    await dispatchMessage(pollMsg);
+  }
+
+  function handleVoteOnPoll(pollId, optionIndex) {
+    const msg = state.messages.find(m => m.id === pollId);
+    if (!msg || !msg.options || !msg.options[optionIndex]) return;
+
+    // Toggle vote on this option
+    msg.options.forEach((opt, idx) => {
+      const userIdx = opt.voters.indexOf(state.self.id);
+      if (idx === optionIndex) {
+        if (userIdx === -1) opt.voters.push(state.self.id);
+        else opt.voters.splice(userIdx, 1);
+      } else {
+        // Single choice vote: remove from other options
+        if (userIdx !== -1) opt.voters.splice(userIdx, 1);
+      }
+    });
+
+    saveMessageToStorage(msg);
+    if (shouldDisplayMessage(msg)) {
+      renderSingleMessageBubble(msg, msg.senderId === state.self.id);
+    }
+
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+      state.ws.send(JSON.stringify({
+        type: 'POLL_VOTE',
+        pollId: pollId,
+        optionIndex: optionIndex,
+        voterName: state.self.name
+      }));
+    }
+  }
+
+  function handleIncomingPollVote(data) {
+    const msg = state.messages.find(m => m.id === data.pollId);
+    if (!msg || !msg.options || !msg.options[data.optionIndex]) return;
+
+    msg.options.forEach((opt, idx) => {
+      const userIdx = opt.voters.indexOf(data.voterId);
+      if (idx === data.optionIndex) {
+        if (userIdx === -1) opt.voters.push(data.voterId);
+        else opt.voters.splice(userIdx, 1);
+      } else {
+        if (userIdx !== -1) opt.voters.splice(userIdx, 1);
+      }
+    });
+
+    saveMessageToStorage(msg);
+    if (shouldDisplayMessage(msg)) {
+      renderSingleMessageBubble(msg, msg.senderId === state.self.id);
+    }
+  }
+
+  // --- 11. ⏱️ Disappearing Messages Lifecycle & Timer ---
+  function openDisappearingModal() {
+    document.querySelectorAll('.disappearing-opt-btn').forEach(btn => {
+      const sec = parseInt(btn.dataset.seconds, 10);
+      btn.classList.toggle('active', sec === state.disappearingSeconds);
+    });
+    elements.disappearingModalOverlay.classList.add('active');
+  }
+
+  function setDisappearingTimer(seconds) {
+    state.disappearingSeconds = seconds;
+    localStorage.setItem('mesh_disappearing_sec', seconds);
+
+    if (seconds > 0) {
+      const label = seconds < 60 ? `${seconds}s` : (seconds < 3600 ? `${Math.round(seconds/60)}m` : `${Math.round(seconds/3600)}h`);
+      elements.disappearingBadge.textContent = label;
+      elements.disappearingBadge.style.display = 'inline-block';
+    } else {
+      elements.disappearingBadge.style.display = 'none';
+    }
+
+    elements.disappearingModalOverlay.classList.remove('active');
+  }
+
+  // Disappearing messages countdown tick
+  setInterval(() => {
+    const now = Date.now();
+    let changed = false;
+
+    for (let i = state.messages.length - 1; i >= 0; i--) {
+      const m = state.messages[i];
+      if (m.expiresAt && now >= m.expiresAt) {
+        deleteMessageFromStorage(m.id);
+        state.messages.splice(i, 1);
+        const row = document.getElementById(`msg-row-${m.id}`);
+        if (row) row.remove();
+        changed = true;
+      }
+    }
+  }, 1000);
+
+  // --- 12. ✏️ Message Editing & Delete for Everyone ---
+  function startEditingMessage(msg) {
+    state.editingMessageId = msg.id;
+    elements.editSnippet.textContent = msg.text || '';
+    elements.editBar.style.display = 'flex';
+    elements.chatMessageInput.value = msg.text || '';
+    elements.chatMessageInput.focus();
+  }
+
+  function cancelEditing() {
+    state.editingMessageId = null;
+    elements.editBar.style.display = 'none';
+    elements.chatMessageInput.value = '';
+  }
+
+  async function submitEditMessage(newText) {
+    const msgId = state.editingMessageId;
+    const msg = state.messages.find(m => m.id === msgId);
+    if (msg) {
+      msg.text = newText;
+      msg.isEdited = true;
+      saveMessageToStorage(msg);
+      renderSingleMessageBubble(msg, true);
+
+      if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+        state.ws.send(JSON.stringify({
+          type: 'MESSAGE_EDIT',
+          messageId: msgId,
+          newText: newText
+        }));
+      }
+    }
+    cancelEditing();
+  }
+
+  function handleIncomingMessageEdit(data) {
+    const msg = state.messages.find(m => m.id === data.messageId);
+    if (msg) {
+      msg.text = data.newText;
+      msg.isEdited = true;
+      saveMessageToStorage(msg);
+      if (shouldDisplayMessage(msg)) {
+        renderSingleMessageBubble(msg, msg.senderId === state.self.id);
+      }
+    }
+  }
+
+  function deleteMessageForEveryone(msgId) {
+    if (!confirm('Delete this message for everyone in the group?')) return;
+
+    deleteMessageFromStorage(msgId);
+    const idx = state.messages.findIndex(m => m.id === msgId);
+    if (idx !== -1) state.messages.splice(idx, 1);
+
+    const row = document.getElementById(`msg-row-${msgId}`);
+    if (row) row.remove();
+
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+      state.ws.send(JSON.stringify({
+        type: 'MESSAGE_DELETE',
+        messageId: msgId
+      }));
+    }
+  }
+
+  function handleIncomingMessageDelete(data) {
+    deleteMessageFromStorage(data.messageId);
+    const idx = state.messages.findIndex(m => m.id === data.messageId);
+    if (idx !== -1) state.messages.splice(idx, 1);
+
+    const row = document.getElementById(`msg-row-${data.messageId}`);
+    if (row) row.remove();
+  }
+
+  // --- 13. 📌 Pinned Announcement Banner ---
+  function pinMessageToTop(msg) {
+    state.pinnedMessage = msg;
+    localStorage.setItem('mesh_pinned_msg', JSON.stringify(msg));
+    renderPinnedBanner();
+
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+      state.ws.send(JSON.stringify({
+        type: 'PIN_MESSAGE',
+        messageId: msg.id,
+        message: msg,
+        unpin: false
+      }));
+    }
+  }
+
+  function unpinMessage() {
+    state.pinnedMessage = null;
+    localStorage.removeItem('mesh_pinned_msg');
+    renderPinnedBanner();
+
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+      state.ws.send(JSON.stringify({
+        type: 'PIN_MESSAGE',
+        unpin: true
+      }));
+    }
+  }
+
+  function renderPinnedBanner() {
+    if (state.pinnedMessage) {
+      elements.pinnedSnippet.textContent = `${state.pinnedMessage.senderName}: ${state.pinnedMessage.text || 'Pinned Item'}`;
+      elements.pinnedMessageBanner.style.display = 'flex';
+      elements.pinnedMessageBanner.onclick = (e) => {
+        if (e.target.id === 'btn-unpin') return;
+        const targetRow = document.getElementById(`msg-row-${state.pinnedMessage.id}`);
+        if (targetRow) {
+          targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          targetRow.classList.add('highlight-pulse');
+          setTimeout(() => targetRow.classList.remove('highlight-pulse'), 1500);
+        }
+      };
+    } else {
+      elements.pinnedMessageBanner.style.display = 'none';
+    }
+  }
+
+  function handleIncomingPinMessage(data) {
+    if (data.unpin) {
+      state.pinnedMessage = null;
+      localStorage.removeItem('mesh_pinned_msg');
+    } else {
+      state.pinnedMessage = data.message;
+      localStorage.setItem('mesh_pinned_msg', JSON.stringify(data.message));
+    }
+    renderPinnedBanner();
+  }
+
+  // --- 14. 🎨 Wallpaper & Accent Themes ---
+  function openWallpaperModal() {
+    document.querySelectorAll('.wallpaper-thumb').forEach(th => {
+      th.classList.toggle('active', th.dataset.bg === state.wallpaper);
+    });
+    document.querySelectorAll('.color-palette .color-dot').forEach(cd => {
+      cd.classList.toggle('active', cd.dataset.accent === state.accentColor);
+    });
+    elements.wallpaperModalOverlay.classList.add('active');
+  }
+
+  function saveWallpaperSettings() {
+    localStorage.setItem('mesh_wallpaper', state.wallpaper);
+    localStorage.setItem('mesh_accent_color', state.accentColor);
+    applyCustomTheme();
+    elements.wallpaperModalOverlay.classList.remove('active');
+  }
+
+  // --- 15. 🚨 Geofence Engine ---
   function checkGeofenceProximity(myLat, myLon) {
     if (!state.geofence.enabled) return;
 
@@ -904,7 +1246,7 @@
     if (state.activeView === 'map') drawMap();
   }
 
-  // --- 11. 🎙️ VOX Hands-Free Voice-Activated Walkie-Talkie ---
+  // --- 16. 🎙️ VOX Hands-Free Radio ---
   async function toggleVoxMode() {
     state.vox.enabled = !state.vox.enabled;
     elements.btnToggleVox.classList.toggle('active', state.vox.enabled);
@@ -940,7 +1282,6 @@
 
         elements.voxMeterFill.style.width = `${normalized * 100}%`;
 
-        // VOX Voice Activation
         if (normalized > state.vox.threshold) {
           if (!state.ptt.isTransmitting) {
             elements.voxStateLabel.textContent = 'Voice Detected! Transmitting...';
@@ -980,7 +1321,7 @@
     if (state.ptt.isTransmitting && !state.ptt.isLocked) stopPttTransmission();
   }
 
-  // --- 12. ⛰️ Elevation Profile & Storm Risk Predictor ---
+  // --- 17. ⛰️ Elevation Tracker ---
   function recordElevation(alt) {
     if (typeof alt !== 'number' || isNaN(alt)) return;
     const rounded = Math.round(alt);
@@ -1046,7 +1387,7 @@
     elements.weatherRiskPill.classList.toggle('warning', stormRisk !== 'Low');
   }
 
-  // --- 13. 🔦 Optical Screen & Torch Morse Code Flasher Engine ---
+  // --- 18. 🔦 Optical Morse Code Flasher ---
   const MORSE_MAP = {
     'A': '.-', 'B': '-...', 'C': '-.-.', 'D': '-..', 'E': '.', 'F': '..-.',
     'G': '--.', 'H': '....', 'I': '..', 'J': '.---', 'K': '-.-', 'L': '.-..',
@@ -1081,7 +1422,6 @@
             const sym = morseSeq[j];
             const duration = sym === '-' ? unitMs * 3 : unitMs;
 
-            // Flash ON
             elements.morseScreenPreview.classList.add('flash-white');
             playMorseBeep(duration);
             if (state.sos.torchTrack) {
@@ -1090,19 +1430,18 @@
 
             await sleep(duration);
 
-            // Flash OFF
             elements.morseScreenPreview.classList.remove('flash-white');
             if (state.sos.torchTrack) {
               try { state.sos.torchTrack.applyConstraints({ advanced: [{ torch: false }] }); } catch(e) {}
             }
 
-            await sleep(unitMs); // Intra-character gap
+            await sleep(unitMs);
           }
 
-          await sleep(unitMs * 2); // Inter-character gap
+          await sleep(unitMs * 2);
         }
 
-        await sleep(unitMs * 5); // Loop gap
+        await sleep(unitMs * 5);
       }
     } catch (e) {
       console.warn('[Morse] Play error:', e);
@@ -1123,7 +1462,7 @@
     }
   }
 
-  // --- 14. 🎯 Tactical 360° Sonar / Radar Canvas Engine ---
+  // --- 19. 🎯 Tactical 360° Sonar / Radar Canvas Engine ---
   function initTacticalRadar() {
     elements.radarModalOverlay.classList.add('active');
     renderRadarLoop();
@@ -1140,14 +1479,12 @@
 
     ctx.clearRect(0, 0, w, h);
 
-    // Background radial glow
     const bgGrad = ctx.createRadialGradient(cx, cy, 10, cx, cy, cx);
     bgGrad.addColorStop(0, '#0f172a');
     bgGrad.addColorStop(1, '#090d16');
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, w, h);
 
-    // Concentric Range Rings (25m, 50m, 100m, 200m)
     [35, 70, 110, 150].forEach((r, idx) => {
       ctx.beginPath();
       ctx.arc(cx, cy, r, 0, Math.PI * 2);
@@ -1160,14 +1497,12 @@
       ctx.fillText(`${(idx + 1) * 50}m`, cx + r - 20, cy - 3);
     });
 
-    // Crosshairs
     ctx.beginPath();
     ctx.moveTo(cx, 0); ctx.lineTo(cx, h);
     ctx.moveTo(0, cy); ctx.lineTo(w, cy);
     ctx.strokeStyle = 'rgba(0, 122, 255, 0.15)';
     ctx.stroke();
 
-    // Rotating Sweep Line
     state.radar.sweepAngle = (state.radar.sweepAngle + 0.03) % (Math.PI * 2);
     const sweepX = cx + Math.cos(state.radar.sweepAngle) * (cx - 10);
     const sweepY = cy + Math.sin(state.radar.sweepAngle) * (cy - 10);
@@ -1179,7 +1514,6 @@
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Draw Teammates on Radar
     if (state.myCoords) {
       state.peerLocations.forEach((peer, peerId) => {
         if (peerId === state.self.id || !peer.coords) return;
@@ -1187,12 +1521,10 @@
         const relBearing = (rawBearing - state.myHeading + 360) % 360;
         const rad = (relBearing - 90) * Math.PI / 180;
 
-        // Approx distance scaling to 150px
         const distPx = Math.min(140, Math.max(30, 70));
         const px = cx + Math.cos(rad) * distPx;
         const py = cy + Math.sin(rad) * distPx;
 
-        // Blip Glow
         ctx.beginPath();
         ctx.arc(px, py, 9, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(255, 149, 0, 0.3)';
@@ -1209,7 +1541,6 @@
       });
     }
 
-    // Center Self Blip
     ctx.beginPath();
     ctx.arc(cx, cy, 6, 0, Math.PI * 2);
     ctx.fillStyle = '#007aff';
@@ -1223,7 +1554,7 @@
     }
   }
 
-  // --- 15. 📡 Multi-Hop Mesh Packet Relay Engine ---
+  // --- 20. 📡 Multi-Hop Mesh Relay Engine ---
   async function dispatchMeshRelayPacket(payload, targetId = 'broadcast') {
     const packet = {
       id: 'pkt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
@@ -1254,7 +1585,6 @@
 
     packet.hopsTaken = (packet.hopsTaken || 0) + 1;
 
-    // Is this packet meant for me or broadcast?
     if (packet.targetId === 'broadcast' || packet.targetId === state.self.id) {
       const msg = packet.payload;
       if (msg) {
@@ -1266,8 +1596,8 @@
     }
   }
 
-  // --- 16. 📦 Chunked P2P File Exchanger Engine ---
-  const CHUNK_SIZE = 48 * 1024; // 48KB per chunk
+  // --- 21. 📦 Chunked P2P File Exchanger ---
+  const CHUNK_SIZE = 48 * 1024;
 
   async function sendFileInChunks(file, targetId = 'broadcast') {
     const transferId = 'transfer_' + Date.now();
@@ -1306,7 +1636,7 @@
           }));
         }
 
-        await new Promise(r => setTimeout(r, 40)); // Smooth chunk cadence
+        await new Promise(r => setTimeout(r, 40));
       }
 
       setTimeout(() => {
@@ -1368,7 +1698,7 @@
     }
   }
 
-  // --- 17. Emergency SOS Beacon & Strobe Engine ---
+  // --- 22. Emergency SOS Beacon ---
   async function activateSosBeacon() {
     state.sos.active = true;
     elements.sosModalOverlay.classList.add('active');
@@ -1447,7 +1777,7 @@
     }
   }
 
-  // --- 18. Offline Wilderness First-Aid & Survival Handbook ---
+  // --- 23. Survival Handbook ---
   const SURVIVAL_GUIDES = [
     {
       cat: 'firstaid',
@@ -1465,29 +1795,9 @@
       body: 'Move out of wind/wet. Replace wet clothes with dry layers. Insulate patient from cold ground with pack/branches. Apply core heat to chest and armpits. Give warm sweet drinks if conscious.'
     },
     {
-      cat: 'firstaid',
-      title: 'Heat Exhaustion vs Heat Stroke',
-      body: 'Heat Stroke is life-threatening (hot dry skin, confusion, no sweat). Immediately move to shade, douse with water, and fan aggressively. Apply wet cold cloths to neck and armpits.'
-    },
-    {
       cat: 'water',
       title: 'Wilderness Water Purification',
       body: '1. Rolling Boil: Boil vigorously for at least 1 full minute (3 mins at altitude).\n2. Solar Disinfection (SODIS): Clear PET bottle in direct sunlight for 6 hours.\n3. DIY Sand/Charcoal Filter: Layer cloth, crushed charcoal, fine sand, and gravel.'
-    },
-    {
-      cat: 'shelter',
-      title: 'Debris Hut & Bivouac Shelter',
-      body: 'Prop a 2.5m ridgepole branch against a sturdy tree fork. Lean ribs along both sides at 45°. Pile 2-3 feet of dry leaves/pine needles on top for waterproof thermal insulation.'
-    },
-    {
-      cat: 'signals',
-      title: 'Ground-to-Air Emergency Signals',
-      body: 'Make large symbols on ground with stones, logs, or stomped snow (min 3m long):\n• "V" = Require Assistance\n• "X" = Require Medical Assistance\n• "SOS" = International Distress Signal\n• 3 fires in a triangle = Universal Distress.'
-    },
-    {
-      cat: 'morse',
-      title: 'International Morse Code Reference',
-      body: 'SOS = · · · — — — · · ·\nA = · — | B = — · · · | C = — · — · | D = — · · | E = ·\nH = · · · · | K = — · — | M = — — | N = — · | O = — — —\nS = · · · | T = — | W = · — — | 1 = · — — — — | 9 = — — — — ·'
     }
   ];
 
@@ -1519,7 +1829,7 @@
     });
   }
 
-  // --- 19. Safety Roll Call Check-In Engine ---
+  // --- 24. Safety Roll Call ---
   function startRollCall() {
     elements.rollcallModalOverlay.classList.add('active');
     elements.rollcallPromptSubtitle.textContent = 'You started a safety roll call';
@@ -1582,7 +1892,7 @@
     `;
   }
 
-  // --- 20. WebSocket Resilient Mesh Hub Client ---
+  // --- 25. WebSocket Resilient Hub Client ---
   let reconnectTimer = null;
   let clientHeartbeatInterval = null;
 
@@ -1720,6 +2030,22 @@
         break;
       }
 
+      case 'POLL_VOTE':
+        handleIncomingPollVote(data);
+        break;
+
+      case 'MESSAGE_EDIT':
+        handleIncomingMessageEdit(data);
+        break;
+
+      case 'MESSAGE_DELETE':
+        handleIncomingMessageDelete(data);
+        break;
+
+      case 'PIN_MESSAGE':
+        handleIncomingPinMessage(data);
+        break;
+
       case 'RELAY_PACKET':
         handleIncomingRelayPacket(data);
         break;
@@ -1807,7 +2133,7 @@
     }
   }
 
-  // --- 21. Walkie-Talkie Push-to-Talk (PTT) ---
+  // --- 26. Walkie-Talkie Push-to-Talk ---
   let pttSelectedIcon = '⛺';
 
   async function startPttTransmission() {
@@ -1909,7 +2235,7 @@
     elements.pttLogList.prepend(item);
   }
 
-  // --- 22. GPS Map Engine & Breadcrumbs ---
+  // --- 27. GPS Map Engine & Breadcrumbs ---
   let mapCanvasCtx = null;
 
   function initMapEngine() {
@@ -2168,7 +2494,7 @@
     if (state.activeView === 'map') drawMap();
   }
 
-  // --- 23. Peer List Rendering ---
+  // --- 28. Peer List Rendering ---
   function getInitials(name) {
     if (!name) return 'U';
     const parts = name.trim().split(/\s+/);
@@ -2232,7 +2558,8 @@
           <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
         </svg>
       `;
-      elements.chatHeaderActions.style.display = 'none';
+      elements.btnAudioCall.style.display = 'none';
+      elements.btnVideoCall.style.display = 'none';
     } else {
       const peer = state.peers.get(targetId);
       const peerName = peer ? peer.name : 'Direct Peer';
@@ -2240,7 +2567,8 @@
       elements.activeChatStatus.textContent = 'Direct Peer Link • Private';
       elements.activeChatAvatar.className = 'peer-avatar user';
       elements.activeChatAvatar.textContent = getInitials(peerName);
-      elements.chatHeaderActions.style.display = 'flex';
+      elements.btnAudioCall.style.display = 'inline-flex';
+      elements.btnVideoCall.style.display = 'inline-flex';
     }
 
     renderMessagesForActiveTarget();
@@ -2274,10 +2602,35 @@
     return directions[idx];
   }
 
-  // --- 24. Message Rendering & History ---
+  // --- 29. Rich Text Markdown Formatter ---
+  function formatRichText(raw) {
+    if (!raw) return '';
+    let t = escapeHtml(raw);
+
+    // Code blocks ```code```
+    t = t.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+    // Inline code `code`
+    t = t.replace(/`([^`]+)`/g, '<code>$1</code>');
+    // Bold **text** or *text*
+    t = t.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    t = t.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    // Strikethrough ~text~
+    t = t.replace(/~([^~]+)~/g, '<del>$1</del>');
+    // URLs
+    t = t.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+
+    return t;
+  }
+
+  // --- 30. Message Rendering & History ---
   function appendMessage(msg, isSelf = false) {
     if (!msg.reactions) msg.reactions = {};
     
+    // Disappearing message expiration
+    if (!msg.expiresAt && state.disappearingSeconds > 0) {
+      msg.expiresAt = Date.now() + (state.disappearingSeconds * 1000);
+    }
+
     const idx = state.messages.findIndex(m => m.id === msg.id);
     if (idx !== -1) {
       state.messages[idx] = msg;
@@ -2299,7 +2652,8 @@
       const matchText = msg.text && msg.text.toLowerCase().includes(q);
       const matchSender = msg.senderName && msg.senderName.toLowerCase().includes(q);
       const matchFile = msg.fileName && msg.fileName.toLowerCase().includes(q);
-      if (!matchText && !matchSender && !matchFile) return false;
+      const matchPoll = msg.question && msg.question.toLowerCase().includes(q);
+      if (!matchText && !matchSender && !matchFile && !matchPoll) return false;
     }
 
     if (state.activeTargetId === 'broadcast') {
@@ -2361,10 +2715,41 @@
       `;
     }
 
+    // 1. Text Message
     if (msg.text) {
-      contentHtml += `<div class="msg-text">${escapeHtml(msg.text)}</div>`;
+      contentHtml += `<div class="msg-text">${formatRichText(msg.text)}</div>`;
     }
 
+    // 2. Interactive Poll
+    if (msg.type === 'poll' && msg.options) {
+      let totalVotes = 0;
+      msg.options.forEach(o => totalVotes += (o.voters ? o.voters.length : 0));
+
+      let optionsHtml = '';
+      msg.options.forEach((opt, idx) => {
+        const votes = opt.voters ? opt.voters.length : 0;
+        const percent = totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0;
+        const hasVoted = opt.voters && opt.voters.includes(state.self.id);
+
+        optionsHtml += `
+          <div class="poll-opt-row ${hasVoted ? 'voted' : ''}" data-poll-id="${msg.id}" data-opt-idx="${idx}">
+            <div class="poll-opt-fill" style="width: ${percent}%;"></div>
+            <span class="poll-opt-text">${hasVoted ? '✓ ' : ''}${escapeHtml(opt.text)}</span>
+            <span class="poll-opt-votes">${votes} (${percent}%)</span>
+          </div>
+        `;
+      });
+
+      contentHtml += `
+        <div class="poll-card">
+          <div class="poll-question">📊 ${escapeHtml(msg.question)}</div>
+          <div class="poll-options-list">${optionsHtml}</div>
+          <div class="poll-footer-info">${totalVotes} total votes • Tap option to vote</div>
+        </div>
+      `;
+    }
+
+    // 3. Location Message
     if (msg.location) {
       let distStr = '';
       if (state.myCoords) {
@@ -2386,6 +2771,7 @@
       `;
     }
 
+    // 4. Audio Voice Memo
     if (msg.audioData) {
       contentHtml += `
         <div class="audio-msg-player" data-audio="${msg.audioData}">
@@ -2398,6 +2784,7 @@
       `;
     }
 
+    // 5. File Attachment
     if (msg.fileData) {
       if (msg.fileType && msg.fileType.startsWith('image/')) {
         contentHtml += `<img src="${msg.fileData}" class="chat-image-preview" alt="Shared media" onclick="window.open('${msg.fileData}')">`;
@@ -2420,6 +2807,7 @@
       }
     }
 
+    // Reactions
     let reactionsHtml = '';
     if (msg.reactions && Object.keys(msg.reactions).length > 0) {
       reactionsHtml += '<div class="reaction-chips-row">';
@@ -2436,22 +2824,30 @@
       reactionsHtml += '</div>';
     }
 
+    let disappearingChip = '';
+    if (msg.expiresAt) {
+      const remainingSec = Math.max(0, Math.round((msg.expiresAt - Date.now()) / 1000));
+      disappearingChip = `<span class="disappearing-countdown" title="Self-destructs in ${remainingSec}s">⏱️ ${remainingSec}s</span>`;
+    }
+
     row.innerHTML = `
       ${!isSelf ? `<div class="msg-sender">${escapeHtml(msg.senderName || 'Peer')}</div>` : ''}
       
       <div class="msg-actions-hover">
         <button class="hover-action-btn" data-action="react" data-msg-id="${msg.id}" data-emoji="👍">👍</button>
         <button class="hover-action-btn" data-action="react" data-msg-id="${msg.id}" data-emoji="❤️">❤️</button>
-        <button class="hover-action-btn" data-action="react" data-msg-id="${msg.id}" data-emoji="📍">📍</button>
-        <button class="hover-action-btn" data-action="react" data-msg-id="${msg.id}" data-emoji="⚠️">⚠️</button>
-        <button class="hover-action-btn" data-action="reply" data-msg-id="${msg.id}">↩</button>
+        <button class="hover-action-btn" data-action="react" data-msg-id="${msg.id}" data-emoji="🔥">🔥</button>
+        <button class="hover-action-btn" data-action="reply" data-msg-id="${msg.id}" title="Reply">↩</button>
+        <button class="hover-action-btn" data-action="pin" data-msg-id="${msg.id}" title="Pin to top">📌</button>
+        ${isSelf && msg.text ? `<button class="hover-action-btn" data-action="edit" data-msg-id="${msg.id}" title="Edit message">✏️</button>` : ''}
+        ${isSelf ? `<button class="hover-action-btn" data-action="delete" data-msg-id="${msg.id}" title="Delete for everyone" style="color: #ff3b30;">🗑️</button>` : ''}
       </div>
 
       <div class="msg-bubble">
         ${contentHtml}
         ${reactionsHtml}
         <div class="msg-footer">
-          <span>${timeStr}</span>
+          <span>${timeStr}${msg.isEdited ? '<span class="msg-edited-badge">(edited)</span>' : ''}${disappearingChip}</span>
           ${isSelf ? `
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="20 6 9 17 4 12"/>
@@ -2466,6 +2862,12 @@
       playBtn.addEventListener('click', () => playVoiceNote(row.querySelector('.audio-msg-player'), playBtn));
     }
 
+    row.querySelectorAll('.poll-opt-row').forEach(optRow => {
+      optRow.addEventListener('click', () => {
+        handleVoteOnPoll(optRow.dataset.pollId, parseInt(optRow.dataset.optIdx, 10));
+      });
+    });
+
     row.querySelectorAll('.hover-action-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -2473,6 +2875,9 @@
         const msgId = btn.dataset.msgId;
         if (action === 'react') sendReaction(msgId, btn.dataset.emoji);
         else if (action === 'reply') startReply(msg);
+        else if (action === 'pin') pinMessageToTop(msg);
+        else if (action === 'edit') startEditingMessage(msg);
+        else if (action === 'delete') deleteMessageForEveryone(msgId);
       });
     });
 
@@ -2528,7 +2933,7 @@
     state.replyingTo = {
       id: msg.id,
       senderName: msg.senderName,
-      text: msg.text || (msg.location ? '📍 GPS Location' : (msg.audioData ? '🎙️ Voice Memo' : '📎 Attachment'))
+      text: msg.text || (msg.location ? '📍 GPS Location' : (msg.audioData ? '🎙️ Voice Memo' : (msg.question ? '📊 Poll' : '📎 Attachment')))
     };
 
     elements.replyAuthor.textContent = `Replying to ${msg.senderName}:`;
@@ -2572,7 +2977,7 @@
     );
   }
 
-  // --- 25. Freeform Sketch Pad ---
+  // --- 31. Freeform Sketch Pad ---
   let canvasCtx = null;
 
   function initSketchCanvas() {
@@ -2670,7 +3075,7 @@
     await dispatchMessage(msg);
   }
 
-  // --- 26. Export Transcript ---
+  // --- 32. Export Transcript ---
   async function exportChatTranscript() {
     const allMsgs = await loadStoredMessages();
     if (allMsgs.length === 0) {
@@ -2690,6 +3095,7 @@
       if (m.location) content = `[GPS Location: ${m.location.latitude}, ${m.location.longitude}]`;
       if (m.audioData) content = `[Voice Memo: ${m.audioDuration || 'audio'}]`;
       if (m.fileData) content = `[Attachment: ${m.fileName}]`;
+      if (m.question) content = `[Poll: ${m.question}]`;
       transcript += `[${time}] ${m.senderName}: ${content}\n`;
     });
 
@@ -2702,7 +3108,7 @@
     URL.revokeObjectURL(url);
   }
 
-  // --- 27. Message Dispatch Helper ---
+  // --- 33. Message Dispatch Helper ---
   async function dispatchMessage(msgObj) {
     if (state.replyingTo) {
       msgObj.quotedMsg = state.replyingTo;
@@ -2718,12 +3124,11 @@
         message: encryptedMsg
       }));
     } else {
-      // Offline Multi-hop attempt
       dispatchMeshRelayPacket(msgObj, state.activeTargetId);
     }
   }
 
-  // --- 28. Voice Memo Recording ---
+  // --- 34. Voice Memo Recording ---
   async function toggleVoiceRecording() {
     if (!state.isRecording) {
       try {
@@ -2795,7 +3200,7 @@
     };
   }
 
-  // --- 29. File & Photo Sharing (with Auto Chunking if > 500KB) ---
+  // --- 35. File & Photo Sharing ---
   function handleFileSelect(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -2832,6 +3237,11 @@
     const text = elements.chatMessageInput.value.trim();
     if (!text) return;
 
+    if (state.editingMessageId) {
+      submitEditMessage(text);
+      return;
+    }
+
     const msg = {
       id: 'msg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
       senderId: state.self.id,
@@ -2845,7 +3255,7 @@
     elements.chatMessageInput.value = '';
   }
 
-  // --- 30. WebRTC Audio & Video Calling Engine ---
+  // --- 36. WebRTC Calling Engine ---
   async function initiateCall(isVideo) {
     if (state.activeTargetId === 'broadcast') {
       alert('Please select a specific peer from the sidebar to start a call.');
@@ -3155,7 +3565,7 @@
     elements.btnCallVideoToggle.classList.remove('muted');
   }
 
-  // --- 31. Encryption & QR Modals ---
+  // --- 37. Encryption & QR Modals ---
   function openEncryptionModal() {
     elements.roomPassphraseInput.value = state.passphrase;
     elements.encryptionModalOverlay.classList.add('active');
@@ -3246,7 +3656,7 @@
     renderMessagesForActiveTarget();
   }
 
-  // --- 32. Event Listeners Initialization ---
+  // --- 38. Event Listeners Initialization ---
   function initEventListeners() {
     // Desktop View Tabs
     if (elements.tabBtnChat) elements.tabBtnChat.addEventListener('click', () => switchView('chat'));
@@ -3262,6 +3672,41 @@
     // Sidebar Backdrop & Drawer Controls
     if (elements.sidebarBackdrop) elements.sidebarBackdrop.addEventListener('click', closeSidebarDrawer);
     if (elements.btnCloseSidebar) elements.btnCloseSidebar.addEventListener('click', closeSidebarDrawer);
+
+    // Consumer Features: Polls, Disappearing, Wallpaper, Edit
+    if (elements.btnCreatePoll) elements.btnCreatePoll.addEventListener('click', openPollModal);
+    if (elements.pollModalCloseBtn) elements.pollModalCloseBtn.addEventListener('click', () => elements.pollModalOverlay.classList.remove('active'));
+    if (elements.btnAddPollOption) elements.btnAddPollOption.addEventListener('click', addPollOptionInput);
+    if (elements.btnSubmitCreatePoll) elements.btnSubmitCreatePoll.addEventListener('click', submitCreatePoll);
+
+    if (elements.btnToggleDisappearing) elements.btnToggleDisappearing.addEventListener('click', openDisappearingModal);
+    if (elements.disappearingModalCloseBtn) elements.disappearingModalCloseBtn.addEventListener('click', () => elements.disappearingModalOverlay.classList.remove('active'));
+    document.querySelectorAll('.disappearing-opt-btn').forEach(btn => {
+      btn.addEventListener('click', () => setDisappearingTimer(parseInt(btn.dataset.seconds, 10)));
+    });
+
+    if (elements.btnOpenWallpapers) elements.btnOpenWallpapers.addEventListener('click', openWallpaperModal);
+    if (elements.wallpaperModalCloseBtn) elements.wallpaperModalCloseBtn.addEventListener('click', () => elements.wallpaperModalOverlay.classList.remove('active'));
+    if (elements.btnSaveWallpaper) elements.btnSaveWallpaper.addEventListener('click', saveWallpaperSettings);
+
+    document.querySelectorAll('.wallpaper-thumb').forEach(th => {
+      th.addEventListener('click', () => {
+        document.querySelectorAll('.wallpaper-thumb').forEach(t => t.classList.remove('active'));
+        th.classList.add('active');
+        state.wallpaper = th.dataset.bg;
+      });
+    });
+
+    document.querySelectorAll('.wallpaper-modal-card .color-dot').forEach(cd => {
+      cd.addEventListener('click', () => {
+        document.querySelectorAll('.wallpaper-modal-card .color-dot').forEach(c => c.classList.remove('active'));
+        cd.classList.add('active');
+        state.accentColor = cd.dataset.accent;
+      });
+    });
+
+    if (elements.btnUnpin) elements.btnUnpin.addEventListener('click', unpinMessage);
+    if (elements.btnCancelEdit) elements.btnCancelEdit.addEventListener('click', cancelEditing);
 
     // AI Survival Assistant
     elements.btnOpenAi.addEventListener('click', () => {
@@ -3382,7 +3827,7 @@
       });
     });
 
-    // Walkie-Talkie Touch / Mouse Handlers
+    // Walkie-Talkie Touch Handlers
     const pttBtn = elements.btnPttGiant;
     pttBtn.addEventListener('contextmenu', (e) => e.preventDefault());
 
@@ -3479,10 +3924,14 @@
     });
   }
 
-  // --- 33. Bootstrap ---
+  // --- 39. Bootstrap ---
   async function init() {
     elements.profileNameInput.value = state.self.name;
     elements.selfIdTag.textContent = `ID: ${state.self.id}`;
+
+    applyCustomTheme();
+    setDisappearingTimer(state.disappearingSeconds);
+    renderPinnedBanner();
 
     await initCryptoKey(state.passphrase);
     await initDatabase();

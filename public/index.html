@@ -241,19 +241,36 @@
           </div>
         </div>
 
-        <div class="chat-header-actions" id="chat-header-actions" style="display: none;">
-          <button class="btn-call-action" id="btn-audio-call" title="Start Audio Call" aria-label="Audio Call">
+        <div class="chat-header-actions" id="chat-header-actions">
+          <button class="btn-call-action" id="btn-toggle-disappearing" title="Disappearing Messages Timer" aria-label="Disappearing Messages">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
+            <span class="timer-dot-badge" id="disappearing-badge" style="display: none;">30s</span>
+          </button>
+          <button class="btn-call-action" id="btn-open-wallpapers" title="Chat Wallpaper & Colors" aria-label="Theme Customizer">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
+          </button>
+          <button class="btn-call-action" id="btn-audio-call" title="Start Audio Call" aria-label="Audio Call" style="display: none;">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
             </svg>
           </button>
-          <button class="btn-call-action" id="btn-video-call" title="Start Video Call" aria-label="Video Call">
+          <button class="btn-call-action" id="btn-video-call" title="Start Video Call" aria-label="Video Call" style="display: none;">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polygon points="23 7 16 12 23 17 23 7"/>
               <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
             </svg>
           </button>
         </div>
+      </div>
+
+      <!-- Pinned Message Banner -->
+      <div class="pinned-message-banner" id="pinned-message-banner" style="display: none;">
+        <span class="pin-icon">📌</span>
+        <div class="pinned-text-wrap">
+          <span class="pinned-label">Pinned Announcement</span>
+          <span class="pinned-snippet" id="pinned-snippet">Important note</span>
+        </div>
+        <button class="btn-unpin" id="btn-unpin" title="Unpin message">&times;</button>
       </div>
 
       <div class="messages-container" id="messages-container">
@@ -272,12 +289,22 @@
 
       <div class="typing-indicator" id="typing-indicator"></div>
 
+      <!-- Reply Bar -->
       <div class="reply-bar" id="reply-bar" style="display: none;">
         <div class="reply-content">
           <span class="reply-author" id="reply-author">Replying to User:</span>
           <span class="reply-snippet" id="reply-snippet">Message text...</span>
         </div>
         <button type="button" class="btn-close-reply" id="btn-cancel-reply">&times;</button>
+      </div>
+
+      <!-- Edit Bar -->
+      <div class="reply-bar edit-mode" id="edit-bar" style="display: none;">
+        <div class="reply-content">
+          <span class="reply-author">✏️ Editing Message:</span>
+          <span class="reply-snippet" id="edit-snippet">Original message...</span>
+        </div>
+        <button type="button" class="btn-close-reply" id="btn-cancel-edit">&times;</button>
       </div>
 
       <div class="chat-input-container" id="chat-input-container">
@@ -287,6 +314,19 @@
           <button type="button" class="btn-tool" id="attach-file-btn" title="Share photo or file" aria-label="Attach File">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+            </svg>
+          </button>
+
+          <button type="button" class="btn-tool" id="btn-create-poll" title="Create Group Poll" aria-label="Create Poll">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+          </button>
+
+          <button type="button" class="btn-tool" id="btn-open-sketch" title="Draw map / sketch" aria-label="Draw Sketch">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 19l7-7 3 3-7 7-3-3z"/>
+              <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
+              <path d="M2 2l7.586 7.586"/>
+              <circle cx="11" cy="11" r="2"/>
             </svg>
           </button>
 
@@ -864,6 +904,113 @@
       <div class="transfer-progress-fill" id="transfer-progress-fill" style="width: 0%;"></div>
     </div>
     <div class="transfer-toast-sub" id="transfer-toast-sub">Chunk 0 / 0 • Validating SHA-256</div>
+  </div>
+
+  <!-- 📊 Live Interactive Poll Creator Modal -->
+  <div class="modal-overlay" id="poll-modal-overlay">
+    <div class="modal-card poll-modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">📊 Create Group Poll</h3>
+          <p class="modal-subtitle">Instant interactive voting with live percentage tally</p>
+        </div>
+        <button class="close-btn" id="poll-modal-close-btn">&times;</button>
+      </div>
+
+      <div class="poll-form-body">
+        <div class="field-group" style="margin-bottom: 12px;">
+          <label class="ip-section-label" for="poll-question-input">Poll Question:</label>
+          <input type="text" class="text-input-field" id="poll-question-input" placeholder="e.g. Where should we eat tonight?">
+        </div>
+
+        <div class="field-group" style="margin-bottom: 14px;">
+          <label class="ip-section-label">Options:</label>
+          <div class="poll-options-inputs" id="poll-options-inputs">
+            <input type="text" class="text-input-field poll-opt-input" placeholder="Option 1" style="margin-bottom: 6px;">
+            <input type="text" class="text-input-field poll-opt-input" placeholder="Option 2" style="margin-bottom: 6px;">
+          </div>
+          <button type="button" class="btn btn-secondary" id="btn-add-poll-option" style="padding: 4px 10px; font-size: 11.5px; margin-top: 4px;">+ Add Option</button>
+        </div>
+
+        <button class="btn btn-primary" style="width: 100%;" id="btn-submit-create-poll">Send Poll to Group</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⏱️ Disappearing Messages Timer Modal -->
+  <div class="modal-overlay" id="disappearing-modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">⏱️ Disappearing Messages</h3>
+          <p class="modal-subtitle">Set messages to self-destruct automatically</p>
+        </div>
+        <button class="close-btn" id="disappearing-modal-close-btn">&times;</button>
+      </div>
+
+      <div class="disappearing-options-list">
+        <button class="disappearing-opt-btn active" data-seconds="0">
+          <span>Off</span>
+          <span class="check-icon">✓</span>
+        </button>
+        <button class="disappearing-opt-btn" data-seconds="30">
+          <span>30 Seconds</span>
+        </button>
+        <button class="disappearing-opt-btn" data-seconds="300">
+          <span>5 Minutes</span>
+        </button>
+        <button class="disappearing-opt-btn" data-seconds="3600">
+          <span>1 Hour</span>
+        </button>
+        <button class="disappearing-opt-btn" data-seconds="86400">
+          <span>24 Hours</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🎨 Chat Wallpaper & Theme Customizer Modal -->
+  <div class="modal-overlay" id="wallpaper-modal-overlay">
+    <div class="modal-card wallpaper-modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">🎨 Chat Theme & Wallpapers</h3>
+          <p class="modal-subtitle">Customize chat backdrop & bubble colors</p>
+        </div>
+        <button class="close-btn" id="wallpaper-modal-close-btn">&times;</button>
+      </div>
+
+      <div class="field-group" style="margin-bottom: 16px;">
+        <label class="ip-section-label">Chat Background Wallpaper:</label>
+        <div class="wallpaper-grid">
+          <button class="wallpaper-thumb active" data-bg="default" style="background: var(--bg-surface);">
+            <span>Default</span>
+          </button>
+          <button class="wallpaper-thumb" data-bg="slate" style="background: #18202f;">
+            <span>Slate</span>
+          </button>
+          <button class="wallpaper-thumb" data-bg="emerald" style="background: #112820;">
+            <span>Emerald</span>
+          </button>
+          <button class="wallpaper-thumb" data-bg="sunset" style="background: #2d1825;">
+            <span>Rose</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="field-group" style="margin-bottom: 16px;">
+        <label class="ip-section-label">Accent Bubble Color:</label>
+        <div class="color-palette">
+          <button class="color-dot active" data-accent="#007aff" style="background-color: #007aff;"></button>
+          <button class="color-dot" data-accent="#34c759" style="background-color: #34c759;"></button>
+          <button class="color-dot" data-accent="#ff9500" style="background-color: #ff9500;"></button>
+          <button class="color-dot" data-accent="#af52de" style="background-color: #af52de;"></button>
+          <button class="color-dot" data-accent="#ff2d55" style="background-color: #ff2d55;"></button>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" style="width: 100%;" id="btn-save-wallpaper">Apply Wallpaper</button>
+    </div>
   </div>
 
   <script src="./app.js"></script>

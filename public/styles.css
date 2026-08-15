@@ -2871,4 +2871,240 @@ body.dark-theme .vox-meter-track {
   margin-bottom: 4px;
 }
 
+/* ==========================================================
+   📌 PINNED MESSAGE BANNER
+   ========================================================== */
+.pinned-message-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 16px;
+  background-color: var(--bg-surface);
+  border-bottom: 1px solid var(--border-divider);
+  z-index: 10;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.pin-icon {
+  font-size: 14px;
+}
+
+.pinned-text-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pinned-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--accent-blue);
+  letter-spacing: -0.01em;
+}
+
+.pinned-snippet {
+  font-size: 12px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn-unpin {
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+/* ==========================================================
+   📊 INTERACTIVE GROUP POLLS
+   ========================================================== */
+.poll-card {
+  background-color: var(--bg-app);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin: 4px 0;
+  min-width: 220px;
+  max-width: 320px;
+}
+
+.poll-question {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+}
+
+.poll-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.poll-opt-row {
+  position: relative;
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-divider);
+  padding: 8px 12px;
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: border-color var(--trans-fast);
+}
+
+.poll-opt-row:hover {
+  border-color: var(--accent-blue);
+}
+
+.poll-opt-row.voted {
+  border-color: var(--accent-blue);
+  font-weight: 600;
+}
+
+.poll-opt-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background-color: var(--accent-blue-tint);
+  z-index: 1;
+  transition: width 0.3s ease-out;
+}
+
+.poll-opt-text {
+  position: relative;
+  z-index: 2;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.poll-opt-votes {
+  position: relative;
+  z-index: 2;
+  font-size: 11.5px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+.poll-footer-info {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-top: 8px;
+  text-align: right;
+}
+
+/* ==========================================================
+   ⏱️ DISAPPEARING TIMER BADGE & OPTIONS
+   ========================================================== */
+.timer-dot-badge {
+  font-size: 9.5px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  background: var(--accent-blue);
+  color: #ffffff;
+  padding: 1px 4px;
+  border-radius: var(--radius-full);
+  margin-left: 2px;
+}
+
+.disappearing-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.disappearing-opt-btn {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--bg-app);
+  border: 1px solid var(--border-divider);
+  border-radius: var(--radius-md);
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--trans-fast);
+}
+
+.disappearing-opt-btn.active {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+  background: var(--accent-blue-tint);
+}
+
+.disappearing-countdown {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  opacity: 0.7;
+  display: inline-block;
+  margin-left: 4px;
+}
+
+/* ==========================================================
+   🎨 CHAT WALLPAPERS & ACCENT CUSTOMIZER
+   ========================================================== */
+.wallpaper-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.wallpaper-thumb {
+  height: 60px;
+  border-radius: var(--radius-md);
+  border: 2px solid var(--border-divider);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform var(--trans-fast), border-color var(--trans-fast);
+}
+
+.wallpaper-thumb.active {
+  border-color: var(--accent-blue);
+  transform: scale(1.04);
+}
+
+/* Custom Wallpapers applied to messages-container */
+.messages-container.bg-slate { background-color: #151b26 !important; }
+.messages-container.bg-emerald { background-color: #0d1e18 !important; }
+.messages-container.bg-sunset { background-color: #24141f !important; }
+
+/* Rich Text Formatting */
+.msg-text strong { font-weight: 700; }
+.msg-text em { font-style: italic; }
+.msg-text del { text-decoration: line-through; opacity: 0.8; }
+.msg-text code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.08);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+body.dark-theme .msg-text code { background: rgba(255, 255, 255, 0.15); }
+.msg-text a {
+  color: var(--accent-blue);
+  text-decoration: underline;
+}
+
+.msg-edited-badge {
+  font-size: 9.5px;
+  opacity: 0.65;
+  margin-left: 3px;
+}
+
+
 

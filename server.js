@@ -253,6 +253,58 @@ wss.on('connection', (ws, req) => {
           break;
         }
 
+        // Live Polls & Group Voting
+        case 'POLL_VOTE': {
+          broadcast({
+            type: 'POLL_VOTE',
+            pollId: data.pollId,
+            optionIndex: data.optionIndex,
+            voterId: currentPeerId,
+            voterName: data.voterName || 'User'
+          });
+          break;
+        }
+
+        // Message Editing
+        case 'MESSAGE_EDIT': {
+          // Update memory session if present
+          const sessionMsg = sessionMessages.find(m => m.id === data.messageId);
+          if (sessionMsg) sessionMsg.text = data.newText;
+
+          broadcast({
+            type: 'MESSAGE_EDIT',
+            messageId: data.messageId,
+            newText: data.newText,
+            senderId: currentPeerId
+          });
+          break;
+        }
+
+        // Delete for Everyone
+        case 'MESSAGE_DELETE': {
+          const idx = sessionMessages.findIndex(m => m.id === data.messageId);
+          if (idx !== -1) sessionMessages.splice(idx, 1);
+
+          broadcast({
+            type: 'MESSAGE_DELETE',
+            messageId: data.messageId,
+            senderId: currentPeerId
+          });
+          break;
+        }
+
+        // Pinned Announcements
+        case 'PIN_MESSAGE': {
+          broadcast({
+            type: 'PIN_MESSAGE',
+            messageId: data.messageId,
+            message: data.message,
+            unpin: !!data.unpin,
+            pinnedBy: currentPeerId
+          });
+          break;
+        }
+
         // Live Push-To-Talk (PTT) Audio Blast
         case 'PTT_AUDIO': {
           broadcast({
