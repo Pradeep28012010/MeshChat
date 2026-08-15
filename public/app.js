@@ -935,7 +935,11 @@
 
       state.ptt.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       state.ptt.chunks = [];
-      state.ptt.recorder = new MediaRecorder(state.ptt.stream);
+      try {
+        state.ptt.recorder = new MediaRecorder(state.ptt.stream, { audioBitsPerSecond: 24000 });
+      } catch (e) {
+        state.ptt.recorder = new MediaRecorder(state.ptt.stream);
+      }
 
       state.ptt.recorder.ondataavailable = (e) => {
         if (e.data.size > 0) state.ptt.chunks.push(e.data);
@@ -1049,12 +1053,16 @@
           localStorage.setItem('mesh_my_trail', JSON.stringify(state.myTrail));
         }
 
-        if (state.ws && state.ws.readyState === WebSocket.OPEN) {
-          state.ws.send(JSON.stringify({
-            type: 'GPS_BROADCAST',
-            senderName: state.self.name,
-            coords: state.myCoords
-          }));
+        const now = Date.now();
+        if (!state._lastGpsBroadcast || now - state._lastGpsBroadcast > 3500) {
+          state._lastGpsBroadcast = now;
+          if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+            state.ws.send(JSON.stringify({
+              type: 'GPS_BROADCAST',
+              senderName: state.self.name,
+              coords: state.myCoords
+            }));
+          }
         }
 
         updateMapStats();
@@ -1784,7 +1792,11 @@
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         state.audioChunks = [];
-        state.mediaRecorder = new MediaRecorder(stream);
+        try {
+          state.mediaRecorder = new MediaRecorder(stream, { audioBitsPerSecond: 28000 });
+        } catch (e) {
+          state.mediaRecorder = new MediaRecorder(stream);
+        }
 
         state.mediaRecorder.ondataavailable = (e) => {
           if (e.data.size > 0) state.audioChunks.push(e.data);

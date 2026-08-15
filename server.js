@@ -41,9 +41,16 @@ function getLocalIPAddresses() {
   return addresses;
 }
 
-// Serve static frontend files
-app.use(express.static(path.join(__dirname, 'public')));
+// Serve static frontend files with caching
+app.use(express.static(path.join(__dirname, 'public'), {
+  maxAge: '1h',
+  etag: true
+}));
 app.use(express.json({ limit: '50mb' }));
+
+// Lightweight instant health / ping endpoint for keep-alive bots
+app.get('/ping', (req, res) => res.status(200).send('pong'));
+app.get('/health', (req, res) => res.status(200).json({ status: 'ok', uptime: process.uptime() }));
 
 // API Endpoint to get connection details for other offline devices
 app.get('/api/info', (req, res) => {
@@ -117,6 +124,8 @@ function getPeerList() {
 
 wss.on('connection', (ws, req) => {
   let currentPeerId = null;
+  ws.isAlive = true;
+  ws.on('pong', () => { ws.isAlive = true; });
 
   ws.on('message', (raw) => {
     try {
@@ -387,6 +396,17 @@ wss.on('connection', (ws, req) => {
     console.error('[MeshHub] WebSocket error:', err);
   });
 });
+
+// Periodic heartbeat to clean up disconnected/idle mobile connections
+const heartbeatInterval = setInterval(() => {
+  wss.clients.forEach((ws) => {
+    if (ws.isAlive === false) return ws.terminate();
+    ws.isAlive = false;
+    ws.ping();
+  });
+}, 25000);
+
+wss.on('close', () => clearInterval(heartbeatInterval));
 
 server.listen(PORT, () => {
   console.log('\n======================================================');
