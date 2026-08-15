@@ -91,7 +91,7 @@ app.get('/api/qr', async (req, res) => {
 // Store connected clients: peerId -> { ws, info: { id, name, avatar, joinedAt, role } }
 const connectedPeers = new Map();
 // Message history in memory for current offline session (persisted on clients via IndexedDB)
-const sessionMessages = [];
+let sessionMessages = [];
 // Real-time collaborative shared notebook / packing checklist
 let activeSharedNote = {
   content: "# 📋 Group Itinerary & Checklist\n\n- [x] Water bottles (2L per person)\n- [x] Portable power banks\n- [ ] First aid & blister kit\n- [ ] Trail maps & compass\n\n*Draft updates sync live across all mesh devices!*",
@@ -350,11 +350,31 @@ wss.on('connection', (ws, req) => {
           break;
         }
 
-        // Custom Sub-Channels Creation
+        // Custom Sub-Channels Creation & Deletion
         case 'CHANNEL_CREATE': {
           broadcast({
             type: 'CHANNEL_CREATE',
             channel: data.channel
+          });
+          break;
+        }
+
+        case 'CHANNEL_DELETE': {
+          broadcast({
+            type: 'CHANNEL_DELETE',
+            channelId: data.channelId
+          });
+          break;
+        }
+
+        case 'CLEAR_ROOM_HISTORY': {
+          if (data.channelId) {
+            sessionMessages = sessionMessages.filter(m => m.channelId !== data.channelId);
+          }
+          broadcast({
+            type: 'CLEAR_ROOM_HISTORY',
+            channelId: data.channelId,
+            senderName: data.senderName
           });
           break;
         }
@@ -415,11 +435,23 @@ wss.on('connection', (ws, req) => {
           break;
         }
 
+        case 'EXPENSE_DELETE': {
+          activeSharedExpenses = activeSharedExpenses.filter(e => e.id !== data.expenseId);
+          broadcast({
+            type: 'EXPENSE_DELETE',
+            expenseId: data.expenseId,
+            expenses: activeSharedExpenses,
+            senderId: currentPeerId
+          });
+          break;
+        }
+
         case 'EXPENSE_RESET': {
           activeSharedExpenses = [];
           broadcast({
-            type: 'EXPENSE_RESET'
-          }, ws);
+            type: 'EXPENSE_RESET',
+            senderId: currentPeerId
+          });
           break;
         }
 

@@ -91,13 +91,21 @@ body.dark-theme {
   --shadow-modal: 0 20px 48px rgba(0, 0, 0, 0.6);
 }
 
-/* Reset & Base */
+/* Reset & Base — Scrollbars hidden globally while maintaining smooth scrolling */
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+*::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 html, body {
@@ -344,6 +352,23 @@ body.dark-theme .btn-icon:hover {
   position: relative;
 }
 
+/* Sidebar Collapse Toggle */
+.app-body.sidebar-hidden .sidebar {
+  display: none !important;
+}
+
+.btn-toggle-sidebar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+}
+
+.btn-toggle-sidebar:hover {
+  color: var(--accent-blue);
+  background-color: var(--accent-blue-tint);
+}
+
 /* Sidebar Drawer */
 .sidebar {
   width: 280px;
@@ -356,6 +381,125 @@ body.dark-theme .btn-icon:hover {
   z-index: 30;
   transition: transform 0.28s var(--ease-apple);
   flex-shrink: 0;
+}
+
+/* Channel Delete Button */
+.channel-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.btn-delete-channel {
+  opacity: 0;
+  pointer-events: none;
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius-xs);
+  transition: all var(--trans-fast);
+}
+
+.channel-item:hover .btn-delete-channel {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.btn-delete-channel:hover {
+  color: var(--status-red);
+  background-color: var(--status-red-tint);
+}
+
+/* Clear Chat Button in Header */
+.btn-clear-chat-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  background-color: transparent;
+  border: 1px solid var(--border-divider);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all var(--trans-fast);
+}
+
+.btn-clear-chat-header:hover {
+  color: var(--status-red);
+  border-color: var(--status-red);
+  background-color: var(--status-red-tint);
+}
+
+/* Connect Modal Modern UI */
+.connect-tabs-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  background: var(--bg-app);
+  padding: 4px;
+  border-radius: var(--radius-sm);
+}
+
+.connect-tab-btn {
+  flex: 1;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-xs);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--trans-fast);
+}
+
+.connect-tab-btn.active {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-subtle);
+}
+
+.connect-url-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--bg-app);
+  border: 1px solid var(--border-divider);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  margin-top: 12px;
+}
+
+.connect-url-text {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent-blue);
+  word-break: break-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exp-item-delete-btn {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: var(--radius-xs);
+  font-size: 12px;
+  transition: all var(--trans-fast);
+}
+
+.exp-item-delete-btn:hover {
+  color: var(--status-red);
+  background-color: var(--status-red-tint);
 }
 
 .sidebar-drawer-top {

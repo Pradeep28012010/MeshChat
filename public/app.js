@@ -547,10 +547,20 @@
     mobTabMenu: document.getElementById('mob-tab-menu'),
     sidebarBackdrop: document.getElementById('sidebar-backdrop'),
     btnCloseSidebar: document.getElementById('btn-close-sidebar'),
+    btnToggleSidebar: document.getElementById('btn-toggle-sidebar'),
+    btnClearChat: document.getElementById('btn-clear-chat'),
 
     viewPaneChat: document.getElementById('view-pane-chat'),
     viewPaneMap: document.getElementById('view-pane-map'),
     viewPanePtt: document.getElementById('view-pane-ptt'),
+
+    // Connect & Invite Modal
+    tabConnectCloud: document.getElementById('tab-connect-cloud'),
+    tabConnectOffline: document.getElementById('tab-connect-offline'),
+    connectCurrentUrl: document.getElementById('connect-current-url'),
+    btnCopyConnectUrl: document.getElementById('btn-copy-connect-url'),
+    btnWebShareInvite: document.getElementById('btn-web-share-invite'),
+    offlineIpSection: document.getElementById('offline-ip-section'),
 
     // Tools Hub
     btnOpenToolsHub: document.getElementById('btn-open-tools-hub'),
@@ -593,6 +603,7 @@
     notesTextarea: document.getElementById('notes-textarea'),
     notesAuthorBadge: document.getElementById('notes-author-badge'),
     btnBroadcastNotes: document.getElementById('btn-broadcast-notes'),
+    btnClearNotes: document.getElementById('btn-clear-notes'),
 
     // Network Telemetry HUD
     btnOpenNetwork: document.getElementById('btn-open-network'),
@@ -996,7 +1007,18 @@
     }
   }
 
+  function deleteExpenseItem(id) {
+    state.sharedExpenses = state.sharedExpenses.filter(e => e.id !== id);
+    localStorage.setItem('mesh_shared_expenses', JSON.stringify(state.sharedExpenses));
+    renderExpensesList();
+
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+      state.ws.send(JSON.stringify({ type: 'EXPENSE_DELETE', expenseId: id }));
+    }
+  }
+
   function renderExpensesList() {
+    if (!elements.expensesList) return;
     elements.expensesList.innerHTML = '';
     let total = 0;
     const paidByMap = {};
@@ -1008,13 +1030,23 @@
       const item = document.createElement('div');
       item.className = 'expense-item-card';
       item.innerHTML = `
-        <div>
+        <div style="min-width: 0; flex: 1;">
           <strong>${escapeHtml(exp.desc)}</strong>
           <div style="font-size: 11px; opacity: 0.65;">Paid by ${escapeHtml(exp.paidBy)}</div>
         </div>
-        <strong style="color: #34c759; font-family: var(--font-mono);">$${exp.amount.toFixed(2)}</strong>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <strong style="color: #34c759; font-family: var(--font-mono);">$${exp.amount.toFixed(2)}</strong>
+          <button class="exp-item-delete-btn" data-exp-id="${escapeHtml(exp.id)}" title="Delete item">✕</button>
+        </div>
       `;
       elements.expensesList.appendChild(item);
+    });
+
+    elements.expensesList.querySelectorAll('.exp-item-delete-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteExpenseItem(btn.dataset.expId);
+      });
     });
 
     if (state.sharedExpenses.length === 0) {
@@ -1024,8 +1056,8 @@
     const peerCount = Math.max(1, state.peers.size);
     const perPerson = total / peerCount;
 
-    elements.expTotalSpend.textContent = `$${total.toFixed(2)}`;
-    elements.expPerPerson.textContent = `$${perPerson.toFixed(2)} (${peerCount} people)`;
+    if (elements.expTotalSpend) elements.expTotalSpend.textContent = `$${total.toFixed(2)}`;
+    if (elements.expPerPerson) elements.expPerPerson.textContent = `$${perPerson.toFixed(2)} (${peerCount} people)`;
 
     // Settlement Tally
     elements.settlementBox.innerHTML = '';
@@ -1299,6 +1331,7 @@
   }
 
   function renderChannelsList() {
+    if (!elements.channelsList) return;
     elements.channelsList.innerHTML = '';
     state.channels.forEach(ch => {
       const isAct = state.activeTargetId === 'broadcast' && state.activeChannelId === ch.id;
@@ -1306,12 +1339,43 @@
       div.className = `channel-item ${isAct ? 'active' : ''}`;
       div.dataset.channelId = ch.id;
       div.innerHTML = `
-        <span class="channel-hash">#</span>
-        <span class="channel-name">${escapeHtml(ch.name)}</span>
+        <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+          <span class="channel-hash">#</span>
+          <span class="channel-name">${escapeHtml(ch.name)}</span>
+        </div>
+        ${ch.id !== 'general' ? `<button class="btn-delete-channel" data-channel-id="${escapeHtml(ch.id)}" title="Delete Channel">✕</button>` : ''}
       `;
-      div.onclick = () => selectChannel(ch.id);
+      div.onclick = (e) => {
+        if (e.target.classList.contains('btn-delete-channel')) {
+          e.stopPropagation();
+          deleteChannel(ch.id);
+          return;
+        }
+        selectChannel(ch.id);
+      };
       elements.channelsList.appendChild(div);
     });
+  }
+
+  function deleteChannel(chId) {
+    if (chId === 'general') return;
+    const ch = state.channels.find(c => c.id === chId);
+    const chName = ch ? ch.name : chId;
+    if (!confirm(`Are you sure you want to delete room #${chName} and all its messages?`)) return;
+
+    state.channels = state.channels.filter(c => c.id !== chId);
+    saveChannelsToStorage();
+    state.messages = state.messages.filter(m => m.channelId !== chId);
+
+    if (state.activeChannelId === chId) {
+      selectChannel('general');
+    } else {
+      renderChannelsList();
+    }
+
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+      state.ws.send(JSON.stringify({ type: 'CHANNEL_DELETE', channelId: chId }));
+    }
   }
 
   function selectChannel(channelId) {
@@ -1375,6 +1439,33 @@
       localStorage.setItem('mesh_channels', JSON.stringify(state.channels));
       renderChannelsList();
     }
+  }
+
+  function handleIncomingChannelDelete(data) {
+    state.channels = state.channels.filter(c => c.id !== data.channelId);
+    localStorage.setItem('mesh_channels', JSON.stringify(state.channels));
+    state.messages = state.messages.filter(m => m.channelId !== data.channelId);
+
+    if (state.activeChannelId === data.channelId) {
+      selectChannel('general');
+    } else {
+      renderChannelsList();
+    }
+  }
+
+  function handleIncomingClearRoomHistory(data) {
+    if (data.channelId) {
+      state.messages = state.messages.filter(m => m.channelId !== data.channelId);
+      if (state.activeChannelId === data.channelId) {
+        renderMessagesForActiveTarget();
+      }
+    }
+  }
+
+  function handleIncomingExpenseDelete(data) {
+    state.sharedExpenses = (data.expenses) || state.sharedExpenses.filter(e => e.id !== data.expenseId);
+    localStorage.setItem('mesh_shared_expenses', JSON.stringify(state.sharedExpenses));
+    renderExpensesList();
   }
 
   // --- 14. ⭐ Starred Messages Vault ---
@@ -2023,6 +2114,17 @@
         messageId: msgId
       }));
     }
+  }
+
+  function deleteMessageForMe(msgId) {
+    if (!confirm('Delete this message from your screen?')) return;
+
+    deleteMessageFromStorage(msgId);
+    const idx = state.messages.findIndex(m => m.id === msgId);
+    if (idx !== -1) state.messages.splice(idx, 1);
+
+    const row = document.getElementById(`msg-row-${msgId}`);
+    if (row) row.remove();
   }
 
   function handleIncomingMessageDelete(data) {
@@ -2882,6 +2984,18 @@
 
       case 'CHANNEL_CREATE':
         handleIncomingChannelCreate(data);
+        break;
+
+      case 'CHANNEL_DELETE':
+        handleIncomingChannelDelete(data);
+        break;
+
+      case 'CLEAR_ROOM_HISTORY':
+        handleIncomingClearRoomHistory(data);
+        break;
+
+      case 'EXPENSE_DELETE':
+        handleIncomingExpenseDelete(data);
         break;
 
       case 'NOTE_UPDATE':
@@ -3760,7 +3874,7 @@
         <button class="hover-action-btn" data-action="reply" data-msg-id="${msg.id}" title="Reply">↩</button>
         <button class="hover-action-btn" data-action="pin" data-msg-id="${msg.id}" title="Pin to top">📌</button>
         ${isSelf && msg.text ? `<button class="hover-action-btn" data-action="edit" data-msg-id="${msg.id}" title="Edit message">✏️</button>` : ''}
-        ${isSelf ? `<button class="hover-action-btn" data-action="delete" data-msg-id="${msg.id}" title="Delete for everyone" style="color: #ff3b30;">🗑️</button>` : ''}
+        ${isSelf ? `<button class="hover-action-btn" data-action="delete" data-msg-id="${msg.id}" title="Delete for everyone" style="color: #ff3b30;">🗑️</button>` : `<button class="hover-action-btn" data-action="delete-me" data-msg-id="${msg.id}" title="Delete for me" style="color: #ff3b30;">🗑️</button>`}
       </div>
 
       <div class="msg-bubble">
@@ -3811,6 +3925,7 @@
         else if (action === 'pin') pinMessageToTop(msg);
         else if (action === 'edit') startEditingMessage(msg);
         else if (action === 'delete') deleteMessageForEveryone(msgId);
+        else if (action === 'delete-me') deleteMessageForMe(msgId);
       });
     });
 
@@ -4551,41 +4666,63 @@
     alert('Encryption passphrase updated.');
   }
 
+  let activeConnectUrl = (typeof window !== 'undefined' && window.location) ? window.location.origin : 'http://localhost:3000';
+  let primaryOfflineUrl = (typeof window !== 'undefined' && window.location) ? `http://${window.location.hostname}:${window.location.port || 3000}` : 'http://localhost:3000';
+
   async function openQRModal() {
+    if (!elements.qrModalOverlay) return;
     elements.qrModalOverlay.classList.add('active');
     elements.qrImageWrapper.innerHTML = '<p class="qr-placeholder-text">Generating QR code...</p>';
-    
+
+    const winLoc = (typeof window !== 'undefined' && window.location) ? window.location : { origin: 'http://localhost:3000', hostname: 'localhost', port: 3000 };
+    activeConnectUrl = winLoc.origin;
+
+    if (elements.connectCurrentUrl) elements.connectCurrentUrl.textContent = activeConnectUrl;
+
     try {
       const res = await fetch('/api/info');
       const data = await res.json();
 
       let ipHtml = '';
-      data.ipAddresses.forEach(ip => {
-        ipHtml += `
-          <div style="margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-            <span><strong style="color: var(--text-primary); font-weight: 500;">${escapeHtml(ip.interface)}:</strong> <span style="font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary);">${escapeHtml(ip.url)}</span></span>
-            <button class="btn btn-secondary" style="padding: 3px 10px; font-size: 11.5px;" onclick="navigator.clipboard.writeText('${escapeHtml(ip.url)}'); this.textContent='Copied!'; setTimeout(()=>this.textContent='Copy', 1500);">Copy</button>
-          </div>
-        `;
-      });
-      elements.ipAddressList.innerHTML = ipHtml || '<div>http://localhost:3000</div>';
+      if (data.ipAddresses && data.ipAddresses.length > 0) {
+        primaryOfflineUrl = data.primaryUrl || data.ipAddresses[0].url;
+        data.ipAddresses.forEach(ip => {
+          ipHtml += `
+            <div style="margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+              <span><strong style="color: var(--text-primary); font-weight: 500;">${escapeHtml(ip.interface)}:</strong> <span style="font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary);">${escapeHtml(ip.url)}</span></span>
+              <button class="btn btn-secondary" style="padding: 3px 10px; font-size: 11.5px;" onclick="navigator.clipboard.writeText('${escapeHtml(ip.url)}'); this.textContent='Copied!'; setTimeout(()=>this.textContent='Copy', 1500);">Copy</button>
+            </div>
+          `;
+        });
+      }
+      if (elements.ipAddressList) elements.ipAddressList.innerHTML = ipHtml || `<div>${escapeHtml(primaryOfflineUrl)}</div>`;
+    } catch (e) {
+      console.warn('[Connect] Info fetch fallback:', e);
+    }
 
-      const targetUrl = data.primaryUrl || `http://${location.hostname}:${location.port || 3000}`;
+    await renderConnectQR(activeConnectUrl);
+  }
+
+  async function renderConnectQR(targetUrl) {
+    if (!elements.qrImageWrapper) return;
+    elements.qrImageWrapper.innerHTML = '<p class="qr-placeholder-text">Generating QR code...</p>';
+
+    try {
       const qrRes = await fetch(`/api/qr?text=${encodeURIComponent(targetUrl)}&format=dataurl`);
       const qrData = await qrRes.json();
 
       if (qrData && qrData.dataUrl) {
-        elements.qrImageWrapper.innerHTML = `<img src="${qrData.dataUrl}" alt="Hotspot Join QR">`;
+        elements.qrImageWrapper.innerHTML = `<img src="${qrData.dataUrl}" alt="Join QR Code" style="width: 180px; height: 180px; border-radius: 8px;">`;
       } else {
         elements.qrImageWrapper.innerHTML = `<p class="qr-instructions">Open <strong>${escapeHtml(targetUrl)}</strong></p>`;
       }
     } catch (e) {
-      elements.qrImageWrapper.innerHTML = `<p class="qr-instructions">Connect to local Wi-Fi and open <strong>http://${location.host}</strong></p>`;
+      elements.qrImageWrapper.innerHTML = `<p class="qr-instructions">Open <strong>${escapeHtml(targetUrl)}</strong></p>`;
     }
   }
 
   function closeQRModal() {
-    elements.qrModalOverlay.classList.remove('active');
+    if (elements.qrModalOverlay) elements.qrModalOverlay.classList.remove('active');
   }
 
   function scrollToBottom() {
@@ -4718,6 +4855,13 @@
     if (elements.btnOpenNotes) elements.btnOpenNotes.addEventListener('click', openNotesModal);
     if (elements.notesModalCloseBtn) elements.notesModalCloseBtn.addEventListener('click', () => elements.notesModalOverlay.classList.remove('active'));
     if (elements.btnBroadcastNotes) elements.btnBroadcastNotes.addEventListener('click', broadcastNotesUpdate);
+    if (elements.btnClearNotes) {
+      elements.btnClearNotes.addEventListener('click', () => {
+        if (!confirm('Clear all collaborative notes?')) return;
+        if (elements.notesTextarea) elements.notesTextarea.value = '';
+        broadcastNotesUpdate();
+      });
+    }
 
     // Network Telemetry HUD
     if (elements.btnOpenNetwork) elements.btnOpenNetwork.addEventListener('click', openNetworkHud);
@@ -4995,12 +5139,95 @@
       });
     }
 
+    // Sidebar Desktop Toggle
+    if (elements.btnToggleSidebar) {
+      elements.btnToggleSidebar.addEventListener('click', () => {
+        const appBody = document.getElementById('app-body');
+        if (appBody) appBody.classList.toggle('sidebar-hidden');
+      });
+    }
+
+    // Clear Chat History for active room/peer
+    if (elements.btnClearChat) {
+      elements.btnClearChat.addEventListener('click', () => {
+        const ch = state.channels.find(c => c.id === state.activeChannelId);
+        const name = ch ? `#${ch.name}` : (state.activeTargetId !== 'broadcast' ? state.activeTargetId : 'this conversation');
+        if (!confirm(`Are you sure you want to clear all messages in ${name}?`)) return;
+
+        if (state.activeTargetId === 'broadcast') {
+          state.messages = state.messages.filter(m => m.channelId !== state.activeChannelId);
+          if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+            state.ws.send(JSON.stringify({
+              type: 'CLEAR_ROOM_HISTORY',
+              channelId: state.activeChannelId,
+              senderName: state.self.name
+            }));
+          }
+        } else {
+          state.messages = state.messages.filter(m => m.targetId !== state.activeTargetId && m.senderId !== state.activeTargetId);
+        }
+        renderMessagesForActiveTarget();
+      });
+    }
+
+    // Modern Connect Modal Controls
     if (elements.qrShareBtn) elements.qrShareBtn.addEventListener('click', openQRModal);
     if (elements.qrModalCloseBtn) elements.qrModalCloseBtn.addEventListener('click', closeQRModal);
     if (elements.qrModalDoneBtn) elements.qrModalDoneBtn.addEventListener('click', closeQRModal);
     if (elements.qrModalOverlay) {
       elements.qrModalOverlay.addEventListener('click', (e) => {
         if (e.target === elements.qrModalOverlay) closeQRModal();
+      });
+    }
+
+    if (elements.tabConnectCloud) {
+      elements.tabConnectCloud.addEventListener('click', () => {
+        elements.tabConnectCloud.classList.add('active');
+        if (elements.tabConnectOffline) elements.tabConnectOffline.classList.remove('active');
+        if (elements.offlineIpSection) elements.offlineIpSection.style.display = 'none';
+        if (elements.connectCurrentUrl) elements.connectCurrentUrl.textContent = activeConnectUrl;
+        if (elements.connectQrInstruction) elements.connectQrInstruction.textContent = 'Scan QR with your phone camera to join instantly from any device.';
+        renderConnectQR(activeConnectUrl);
+      });
+    }
+
+    if (elements.tabConnectOffline) {
+      elements.tabConnectOffline.addEventListener('click', () => {
+        elements.tabConnectOffline.classList.add('active');
+        if (elements.tabConnectCloud) elements.tabConnectCloud.classList.remove('active');
+        if (elements.offlineIpSection) elements.offlineIpSection.style.display = 'block';
+        if (elements.connectCurrentUrl) elements.connectCurrentUrl.textContent = primaryOfflineUrl;
+        if (elements.connectQrInstruction) elements.connectQrInstruction.textContent = 'Connect phone to local Wi-Fi / Hotspot and scan this QR code:';
+        renderConnectQR(primaryOfflineUrl);
+      });
+    }
+
+    if (elements.btnCopyConnectUrl) {
+      elements.btnCopyConnectUrl.addEventListener('click', () => {
+        const urlToCopy = (elements.connectCurrentUrl && elements.connectCurrentUrl.textContent) || activeConnectUrl;
+        navigator.clipboard.writeText(urlToCopy);
+        elements.btnCopyConnectUrl.textContent = '✓ Copied!';
+        setTimeout(() => { elements.btnCopyConnectUrl.textContent = 'Copy Link'; }, 2000);
+      });
+    }
+
+    if (elements.btnWebShareInvite) {
+      elements.btnWebShareInvite.addEventListener('click', async () => {
+        const urlToShare = (elements.connectCurrentUrl && elements.connectCurrentUrl.textContent) || activeConnectUrl;
+        if (navigator.share) {
+          try {
+            await navigator.share({
+              title: 'Join MeshChat',
+              text: 'Join our private chat room on MeshChat:',
+              url: urlToShare
+            });
+          } catch (err) {
+            console.log('Share canceled or failed:', err);
+          }
+        } else {
+          navigator.clipboard.writeText(urlToShare);
+          alert(`Link copied to clipboard!\n${urlToShare}`);
+        }
       });
     }
 
