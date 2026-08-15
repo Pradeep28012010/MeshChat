@@ -1,0 +1,26 @@
+{
+  "name": "offline-mesh-chat",
+  "version": "1.0.0",
+  "description": "Zero-Internet Offline Messaging & P2P Web App for Phones & Laptops",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "offline",
+    "mesh",
+    "webrtc",
+    "p2p",
+    "chat",
+    "zero-internet",
+    "hotspot"
+  ],
+  "author": "Antigravity",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.21.2",
+    "qrcode": "^1.5.4",
+    "ws": "^8.18.0"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "MeshChat Offline",
+  "short_name": "MeshChat",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#090d16",
+  "theme_color": "#090d16",
+  "description": "Zero-Internet Offline Messaging & P2P Web App for Phones and Laptops",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='128' fill='%2310b981'/%3E%3Cpath d='M140 180h232c16.5 0 30 13.5 30 30v120c0 16.5-13.5 30-30 30H240l-60 45v-45h-40c-16.5 0-30-13.5-30-30V210c0-16.5 13.5-30 30-30z' fill='white'/%3E%3Ccircle cx='200' cy='270' r='16' fill='%2310b981'/%3E%3Ccircle cx='256' cy='270' r='16' fill='%2310b981'/%3E%3Ccircle cx='312' cy='270' r='16' fill='%2310b981'/%3E%3C/svg%3E",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}

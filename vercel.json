@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "public": true,
+  "routes": [
+    {
+      "src": "/api/info",
+      "dest": "/server.js"
+    },
+    {
+      "src": "/api/qr",
+      "dest": "/server.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/public/$1"
+    }
+  ]
+}

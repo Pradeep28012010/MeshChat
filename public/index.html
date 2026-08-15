@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#f5f5f7">
+  <meta name="description" content="Zero-Internet Offline Messaging, Calling, GPS Map, Walkie-Talkie & Survival Suite">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="stylesheet" href="./styles.css">
+  <title>MeshChat — Offline Local & Survival Suite</title>
+</head>
+<body>
+
+  <!-- Top App Header -->
+  <header class="app-header" id="app-header">
+    <div class="brand-section">
+      <button class="btn-icon menu-toggle-btn" id="menu-toggle-btn" aria-label="Toggle Peers Menu">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      
+      <div class="brand-glyph" id="brand-logo">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12.55a11 11 0 0 1 14.08 0"></path>
+          <path d="M1.42 9a16 16 0 0 1 21.16 0"></path>
+          <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+          <circle cx="12" cy="20" r="1" fill="currentColor"></circle>
+        </svg>
+      </div>
+
+      <div class="brand-info">
+        <div class="brand-title-row">
+          <h1>MeshChat</h1>
+          <span class="mode-badge" id="network-mode-badge">Offline Local</span>
+          <span class="e2ee-badge" id="e2ee-status-badge" title="End-to-End Encrypted (AES-256)">🔒 E2EE</span>
+        </div>
+        <div class="brand-status">
+          <span class="status-dot" id="connection-status-dot"></span>
+          <span id="connection-status-text">Connected to local mesh</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center Navigation Segmented Switcher -->
+    <div class="header-nav-segmented">
+      <button class="nav-segment-btn active" data-view="chat" id="tab-btn-chat">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span>Chat</span>
+      </button>
+      <button class="nav-segment-btn" data-view="map" id="tab-btn-map">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+        <span>GPS Map</span>
+      </button>
+      <button class="nav-segment-btn" data-view="ptt" id="tab-btn-ptt">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        <span>Walkie-Talkie</span>
+      </button>
+    </div>
+
+    <!-- Header Actions -->
+    <div class="header-actions">
+      <!-- SOS Emergency Beacon Button -->
+      <button class="btn-icon btn-sos-trigger" id="btn-sos-beacon" title="Emergency SOS Beacon & Siren" aria-label="Emergency SOS">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+      </button>
+
+      <!-- Survival & First-Aid Guide -->
+      <button class="btn-icon" id="btn-open-guide" title="Offline Survival & First Aid Guide" aria-label="Survival Handbook">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+        </svg>
+      </button>
+
+      <!-- Safety Roll Call Action -->
+      <button class="btn-icon" id="btn-start-rollcall" title="Initiate Team Safety Check-In" aria-label="Team Roll Call">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="8.5" cy="7" r="4"/>
+          <polyline points="17 11 19 13 23 9"/>
+        </svg>
+      </button>
+
+      <!-- Dark / Light Appearance Toggle -->
+      <button class="btn-icon" id="btn-toggle-theme" title="Toggle Appearance" aria-label="Toggle Dark Mode">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"/>
+          <line x1="12" y1="1" x2="12" y2="3"/>
+          <line x1="12" y1="21" x2="12" y2="23"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1" y1="12" x2="3" y2="12"/>
+          <line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+      </button>
+
+      <!-- Security / Encryption Settings Button -->
+      <button class="btn-icon" id="btn-open-encryption" title="Encryption Settings" aria-label="Security Settings">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+      </button>
+
+      <!-- Hotspot QR Modal Button -->
+      <button class="btn btn-primary" id="qr-share-btn" title="Show QR code for other phones to join">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1.5"/>
+          <rect x="14" y="3" width="7" height="7" rx="1.5"/>
+          <rect x="14" y="14" width="7" height="7" rx="1.5"/>
+          <rect x="3" y="14" width="7" height="7" rx="1.5"/>
+        </svg>
+        <span>Connect</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Application Body -->
+  <main class="app-body" id="app-body">
+    
+    <!-- Left Sidebar: Connected Peers & Search -->
+    <aside class="sidebar" id="sidebar">
+      
+      <!-- Search Input Container -->
+      <div class="sidebar-search-box">
+        <div class="search-input-wrapper">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input type="text" id="search-input" placeholder="Search offline messages..." autocomplete="off">
+          <button type="button" class="btn-clear-search" id="btn-clear-search" style="display: none;">&times;</button>
+        </div>
+      </div>
+
+      <div class="sidebar-header">
+        <span class="sidebar-title">Channels & Peers</span>
+        <span class="peer-count-badge" id="peer-count-badge">0 Online</span>
+      </div>
+
+      <!-- Peer Channels List -->
+      <div class="peer-list" id="peer-list">
+        <div class="peer-item active" id="peer-target-broadcast" data-peer-id="broadcast">
+          <div class="peer-avatar group">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+          </div>
+          <div class="peer-meta">
+            <div class="peer-name">All Group</div>
+            <div class="peer-sub">Broadcast Channel</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Current User Profile Strip with Battery -->
+      <div class="user-profile-strip" id="user-profile-strip">
+        <div class="profile-info">
+          <div class="peer-avatar user" id="self-avatar">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+          </div>
+          <div class="profile-text-wrap">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <input type="text" class="profile-name-input" id="profile-name-input" value="User_1" placeholder="Your Name" title="Edit your display name">
+              <span class="battery-pill" id="self-battery-pill" title="Battery Status">⚡ 100%</span>
+            </div>
+            <div class="peer-sub" id="self-id-tag">ID: local-peer</div>
+          </div>
+          <button class="btn-icon" id="btn-export-chat" title="Export Offline Transcript" aria-label="Export Chat">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 1. Main Chat View -->
+    <section class="chat-main view-pane" id="view-pane-chat">
+      <div class="chat-header" id="chat-header">
+        <div class="chat-target-info">
+          <div class="peer-avatar group" id="active-chat-avatar">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+          </div>
+          <div>
+            <div class="chat-target-name" id="active-chat-title">All Group</div>
+            <div class="chat-target-status" id="active-chat-status">Encrypted Local Mesh • No Internet Required</div>
+          </div>
+        </div>
+
+        <div class="chat-header-actions" id="chat-header-actions" style="display: none;">
+          <button class="btn-call-action" id="btn-audio-call" title="Start Audio Call" aria-label="Audio Call">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+            </svg>
+          </button>
+          <button class="btn-call-action" id="btn-video-call" title="Start Video Call" aria-label="Video Call">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="23 7 16 12 23 17 23 7"/>
+              <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="messages-container" id="messages-container">
+        <div class="system-notice-card">
+          <div class="notice-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+          </div>
+          <div class="notice-body">
+            <strong>Zero-Internet Local Network Active</strong>
+            <p>Messages, voice memos, sketches, and calls stay strictly within your local Wi-Fi / Hotspot. Fully encrypted with AES-256 on-device.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="typing-indicator" id="typing-indicator"></div>
+
+      <div class="reply-bar" id="reply-bar" style="display: none;">
+        <div class="reply-content">
+          <span class="reply-author" id="reply-author">Replying to User:</span>
+          <span class="reply-snippet" id="reply-snippet">Message text...</span>
+        </div>
+        <button type="button" class="btn-close-reply" id="btn-cancel-reply">&times;</button>
+      </div>
+
+      <div class="chat-input-container" id="chat-input-container">
+        <form class="input-form" id="chat-form">
+          <input type="file" id="file-input" style="display: none;" accept="image/*,audio/*,application/pdf,text/*">
+          
+          <button type="button" class="btn-tool" id="attach-file-btn" title="Share photo or file offline" aria-label="Attach File">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+            </svg>
+          </button>
+
+          <button type="button" class="btn-tool" id="btn-open-sketch" title="Draw map / sketch offline" aria-label="Draw Sketch">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 19l7-7 3 3-7 7-3-3z"/>
+              <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
+              <path d="M2 2l7.586 7.586"/>
+              <circle cx="11" cy="11" r="2"/>
+            </svg>
+          </button>
+
+          <button type="button" class="btn-tool" id="btn-share-location" title="Share GPS location & distance offline" aria-label="Share Location">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+              <circle cx="12" cy="10" r="3"/>
+            </svg>
+          </button>
+
+          <button type="button" class="btn-tool" id="voice-record-btn" title="Record offline voice memo" aria-label="Record Voice Memo">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+              <line x1="12" y1="19" x2="12" y2="23"/>
+              <line x1="8" y1="23" x2="16" y2="23"/>
+            </svg>
+          </button>
+
+          <input type="text" class="chat-input" id="chat-message-input" placeholder="iMessage / Local Message..." autocomplete="off">
+
+          <button type="submit" class="btn-send" id="send-message-btn" aria-label="Send Message">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="19" x2="12" y2="5"/>
+              <polyline points="5 12 12 5 19 12"/>
+            </svg>
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <!-- 2. Offline GPS Map View -->
+    <section class="map-main view-pane" id="view-pane-map" style="display: none;">
+      <div class="map-stats-strip">
+        <div class="map-stat-item">
+          <span class="stat-label">GPS LOCK:</span>
+          <span class="stat-value active" id="map-gps-status">Active (3D Fix)</span>
+        </div>
+        <div class="map-stat-item">
+          <span class="stat-label">BREADCRUMBS:</span>
+          <span class="stat-value" id="map-trail-points">0 Recorded</span>
+        </div>
+        <div class="map-stat-item">
+          <span class="stat-label">PEERS ON MAP:</span>
+          <span class="stat-value" id="map-peer-count">0 Tracked</span>
+        </div>
+        <div class="map-actions-group">
+          <button class="btn btn-secondary" id="btn-drop-waypoint" style="padding: 4px 10px; font-size: 12px;">+ Drop Waypoint</button>
+          <button class="btn btn-secondary" id="btn-recenter-map" style="padding: 4px 10px; font-size: 12px;">🎯 Recenter</button>
+        </div>
+      </div>
+
+      <div class="map-canvas-container">
+        <canvas id="offline-map-canvas"></canvas>
+      </div>
+    </section>
+
+    <!-- 3. Walkie-Talkie Push-to-Talk (PTT) View -->
+    <section class="ptt-main view-pane" id="view-pane-ptt" style="display: none;">
+      <div class="ptt-container">
+        <div class="ptt-header-card">
+          <div class="ptt-channel-badge">📻 CH 01 • MESH BROADCAST</div>
+          <h2>Walkie-Talkie Radio</h2>
+          <p>Hold button to transmit voice blast directly to all nearby devices</p>
+        </div>
+
+        <div class="ptt-button-wrapper">
+          <div class="ptt-ring-pulse" id="ptt-ring-pulse"></div>
+          <button class="btn-ptt-giant" id="btn-ptt-giant" aria-label="Push to Talk">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+              <line x1="12" y1="19" x2="12" y2="23"/>
+              <line x1="8" y1="23" x2="16" y2="23"/>
+            </svg>
+            <span class="ptt-btn-label" id="ptt-btn-label">HOLD TO TALK</span>
+          </button>
+        </div>
+
+        <div class="ptt-activity-card">
+          <h4>Recent Radio Transmissions</h4>
+          <div class="ptt-log-list" id="ptt-log-list">
+            <div class="ptt-log-item empty">No transmissions yet on this mesh channel.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Emergency SOS Siren & Strobe Fullscreen Modal -->
+  <div class="modal-overlay sos-fullscreen-overlay" id="sos-modal-overlay">
+    <div class="sos-modal-card">
+      <div class="sos-pulse-icon">🚨</div>
+      <h2 class="sos-title">EMERGENCY SOS BEACON</h2>
+      <p class="sos-desc">Transmitting high-priority distress alert with GPS coordinates to all mesh devices & sounding audio alarm.</p>
+
+      <div class="sos-coords-box" id="sos-coords-box">
+        Acquiring emergency GPS coordinates...
+      </div>
+
+      <div class="sos-controls-row">
+        <button class="btn btn-secondary" id="btn-toggle-torch">🔦 Toggle Camera Torch</button>
+        <button class="btn btn-sos-deactivate" id="btn-stop-sos">DEACTIVATE SOS BEACON</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Wilderness First-Aid & Survival Handbook Modal -->
+  <div class="modal-overlay" id="guide-modal-overlay">
+    <div class="modal-card guide-modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">📖 Offline Wilderness Survival Guide</h3>
+          <p class="modal-subtitle">Field handbook & first-aid protocols (100% offline)</p>
+        </div>
+        <button class="close-btn" id="guide-modal-close-btn">&times;</button>
+      </div>
+
+      <div class="guide-search-wrapper">
+        <input type="text" class="text-input-field" id="guide-search-input" placeholder="Search first aid, bites, water purification, CPR...">
+      </div>
+
+      <div class="guide-tabs-bar">
+        <button class="guide-tab-btn active" data-cat="firstaid">🩹 First Aid</button>
+        <button class="guide-tab-btn" data-cat="water">💧 Water & Food</button>
+        <button class="guide-tab-btn" data-cat="shelter">⛺ Shelter & Fire</button>
+        <button class="guide-tab-btn" data-cat="signals">🚩 Rescue Signals</button>
+        <button class="guide-tab-btn" data-cat="morse">📡 Morse Code</button>
+      </div>
+
+      <div class="guide-content-area" id="guide-content-area">
+        <!-- Content dynamic injection -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Safety Roll Call Check-In Modal -->
+  <div class="modal-overlay" id="rollcall-modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">👥 Team Safety Check-In</h3>
+          <p class="modal-subtitle" id="rollcall-prompt-subtitle">Roll call requested by Leader</p>
+        </div>
+        <button class="close-btn" id="rollcall-modal-close-btn">&times;</button>
+      </div>
+
+      <div class="rollcall-action-box">
+        <button class="btn btn-rollcall-ok" id="btn-rollcall-ok">✅ I'm OK & Safe</button>
+        <button class="btn btn-rollcall-help" id="btn-rollcall-help">⚠️ Need Assistance</button>
+      </div>
+
+      <div class="rollcall-results-box" id="rollcall-results-box">
+        <div class="ip-section-label">Team Check-In Status:</div>
+        <div class="rollcall-status-list" id="rollcall-status-list">
+          <div class="ptt-log-item empty">Waiting for team responses...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Connect Nearby Peers / QR Code Modal -->
+  <div class="modal-overlay" id="qr-modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">Connect Nearby Devices</h3>
+          <p class="modal-subtitle">Share this offline network with friends nearby</p>
+        </div>
+        <button class="close-btn" id="qr-modal-close-btn" aria-label="Close modal">&times;</button>
+      </div>
+
+      <div class="qr-presentation">
+        <div class="qr-box" id="qr-container">
+          <div id="qr-image-wrapper">
+            <p class="qr-placeholder-text">Generating QR code...</p>
+          </div>
+        </div>
+        <p class="qr-instructions">
+          Scan this QR code with any iPhone, Android, or laptop camera connected to this Wi-Fi hotspot.
+        </p>
+      </div>
+
+      <div class="ip-section">
+        <span class="ip-section-label">Or open in browser:</span>
+        <div class="ip-list-block" id="ip-address-list">
+          http://localhost:3000
+        </div>
+      </div>
+
+      <button class="btn btn-secondary" style="width: 100%; margin-top: 20px;" id="qr-modal-done-btn">Done</button>
+    </div>
+  </div>
+
+  <!-- Encryption & Security Key Settings Modal -->
+  <div class="modal-overlay" id="encryption-modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">🔒 End-to-End Encryption</h3>
+          <p class="modal-subtitle">AES-GCM 256-bit on-device encryption</p>
+        </div>
+        <button class="close-btn" id="encryption-modal-close-btn" aria-label="Close modal">&times;</button>
+      </div>
+
+      <p class="qr-instructions" style="text-align: left; margin-bottom: 12px;">
+        All messages and media are cryptographically encrypted in your browser before transmission. Set a shared group password if you want an extra private channel:
+      </p>
+
+      <div class="field-group" style="margin-bottom: 16px;">
+        <label for="room-passphrase-input" class="ip-section-label">Group Encryption Key / Passphrase:</label>
+        <input type="password" class="text-input-field" id="room-passphrase-input" placeholder="Default: mesh-default-key">
+      </div>
+
+      <button class="btn btn-primary" style="width: 100%;" id="btn-save-encryption">Save Key</button>
+    </div>
+  </div>
+
+  <!-- Drop Waypoint Modal -->
+  <div class="modal-overlay" id="waypoint-modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">📍 Drop Offline Waypoint</h3>
+          <p class="modal-subtitle">Pin a marker on the map for the group</p>
+        </div>
+        <button class="close-btn" id="waypoint-modal-close-btn">&times;</button>
+      </div>
+
+      <div class="field-group" style="margin-bottom: 14px;">
+        <label class="ip-section-label" for="waypoint-name-input">Waypoint Label:</label>
+        <input type="text" class="text-input-field" id="waypoint-name-input" placeholder="e.g. Campsite Alpha, Water Spring">
+      </div>
+
+      <div class="field-group" style="margin-bottom: 18px;">
+        <label class="ip-section-label">Waypoint Icon:</label>
+        <div class="color-palette" id="waypoint-icon-palette">
+          <button class="stroke-btn active" data-icon="⛺">⛺ Camp</button>
+          <button class="stroke-btn" data-icon="💧">💧 Water</button>
+          <button class="stroke-btn" data-icon="🚗">🚗 Vehicle</button>
+          <button class="stroke-btn" data-icon="🚩">🚩 Meeting</button>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" style="width: 100%;" id="btn-confirm-waypoint">Save Waypoint</button>
+    </div>
+  </div>
+
+  <!-- Freeform Offline Sketch / Drawing Modal -->
+  <div class="modal-overlay" id="sketch-modal-overlay">
+    <div class="modal-card sketch-modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">🎨 Freeform Sketch & Trail Map</h3>
+          <p class="modal-subtitle">Draw routes, notes, or maps offline</p>
+        </div>
+        <button class="close-btn" id="sketch-modal-close-btn">&times;</button>
+      </div>
+
+      <div class="sketch-canvas-wrapper">
+        <canvas id="sketch-canvas" width="600" height="380"></canvas>
+      </div>
+
+      <div class="sketch-tools-bar">
+        <div class="color-palette">
+          <button class="color-dot active" data-color="#000000" style="background-color: #000000;"></button>
+          <button class="color-dot" data-color="#0071e3" style="background-color: #0071e3;"></button>
+          <button class="color-dot" data-color="#34c759" style="background-color: #34c759;"></button>
+          <button class="color-dot" data-color="#ff9500" style="background-color: #ff9500;"></button>
+          <button class="color-dot" data-color="#ff3b30" style="background-color: #ff3b30;"></button>
+        </div>
+
+        <div class="stroke-sizes">
+          <button class="stroke-btn active" data-size="3">Fine</button>
+          <button class="stroke-btn" data-size="7">Thick</button>
+        </div>
+
+        <button class="btn btn-secondary" id="btn-clear-sketch" style="padding: 4px 10px; font-size: 12px;">Clear</button>
+        <button class="btn btn-primary" id="btn-send-sketch" style="margin-left: auto; padding: 6px 14px;">Send Sketch</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Incoming Call Sheet / Notification -->
+  <div class="call-banner-overlay" id="incoming-call-overlay">
+    <div class="incoming-call-card">
+      <div class="incoming-avatar" id="incoming-call-avatar">U</div>
+      <div class="incoming-info">
+        <h4 id="incoming-caller-name">User</h4>
+        <p id="incoming-call-type">Incoming Offline Call...</p>
+      </div>
+      <div class="incoming-actions">
+        <button class="btn-call-circle decline" id="btn-incoming-decline" title="Decline Call" aria-label="Decline">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+        <button class="btn-call-circle accept" id="btn-incoming-accept" title="Accept Call" aria-label="Accept">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Active In-Call Viewport Overlay -->
+  <div class="active-call-overlay" id="active-call-overlay">
+    <div class="active-call-viewport">
+      <div class="call-video-container" id="call-video-container">
+        <video id="remote-video" autoplay playsinline></video>
+        <video id="local-video" autoplay playsinline muted></video>
+      </div>
+
+      <div class="call-audio-container" id="call-audio-container">
+        <div class="call-audio-avatar-wrap">
+          <div class="call-audio-avatar" id="call-active-avatar">U</div>
+          <div class="call-audio-pulse"></div>
+        </div>
+        <h3 class="call-active-name" id="call-active-name">User</h3>
+        <p class="call-status-label" id="call-status-label">Calling on local Wi-Fi...</p>
+        <div class="call-timer" id="call-timer">00:00</div>
+      </div>
+
+      <div class="call-controls-dock">
+        <button class="call-dock-btn" id="btn-call-mute" title="Mute Microphone" aria-label="Mute Microphone">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="23"/>
+            <line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+        </button>
+
+        <button class="call-dock-btn" id="btn-call-video-toggle" title="Toggle Camera" aria-label="Toggle Camera">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="23 7 16 12 23 17 23 7"/>
+            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+          </svg>
+        </button>
+
+        <button class="call-dock-btn end-call" id="btn-call-end" title="End Call" aria-label="End Call">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-3.33-2.67m-2.67-3.34a19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"/>
+            <line x1="23" y1="1" x2="1" y2="23"/>
+          </svg>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
