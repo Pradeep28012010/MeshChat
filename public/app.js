@@ -1,12 +1,12 @@
 /**
  * MeshChat — Zero-Internet Messaging, Calling, GPS Map, Walkie-Talkie & Survival Suite
- * Adaptive Mobile & Desktop Architecture
+ * Advanced Modules: Compass HUD, Offline AI Survival, Geofencing, VOX Hands-Free & Elevation Tracker
  */
 
 (function () {
   'use strict';
 
-  // --- 1. Sound Synthesizer (Web Audio API - Cues, Ringtone, Squelch & SOS Morse Code) ---
+  // --- 1. Sound Synthesizer (Web Audio API - Cues, Ringtone, Squelch, SOS & Geofence Alarm) ---
   const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   
   function playSound(type) {
@@ -61,6 +61,19 @@
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
       osc.start(now);
       osc.stop(now + 0.15);
+    } else if (type === 'geofence_alarm') {
+      [580, 870, 580, 870].forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(freq, now + i * 0.15);
+        gain.gain.setValueAtTime(0.2, now + i * 0.15);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.15 + 0.12);
+        osc.start(now + i * 0.15);
+        osc.stop(now + i * 0.15 + 0.12);
+      });
     }
   }
 
@@ -135,7 +148,7 @@
     }
   }
 
-  // --- 2. End-to-End Encryption Manager (AES-GCM 256-bit) ---
+  // --- 2. End-to-End Encryption (AES-GCM 256-bit) ---
   let cryptoKey = null;
   const SALT = new Uint8Array([77, 101, 115, 104, 67, 104, 97, 116, 79, 102, 102, 108, 105, 110, 101, 49]);
 
@@ -210,7 +223,7 @@
     }
   }
 
-  // --- 3. IndexedDB Storage ---
+  // --- 3. IndexedDB Local Storage ---
   const DB_NAME = 'MeshChatLocalDB';
   const DB_VERSION = 3;
   let db = null;
@@ -276,10 +289,12 @@
     peerBatteries: new Map(),
     waypoints: JSON.parse(localStorage.getItem('mesh_waypoints') || '[]'),
     myTrail: JSON.parse(localStorage.getItem('mesh_my_trail') || '[]'),
+    elevationHistory: JSON.parse(localStorage.getItem('mesh_elevation_history') || '[]'),
     messages: [],
     searchQuery: '',
     replyingTo: null,
     myCoords: null,
+    myHeading: 0,
     batteryPercent: 100,
     ws: null,
     connected: false,
@@ -287,6 +302,24 @@
     mediaRecorder: null,
     audioChunks: [],
     
+    // Geofence Perimeter
+    geofence: {
+      enabled: localStorage.getItem('mesh_geofence_enabled') === 'true',
+      radiusMeters: parseInt(localStorage.getItem('mesh_geofence_radius') || '250', 10),
+      originCoords: null,
+      lastAlertTime: 0
+    },
+
+    // VOX Hands-Free Radio
+    vox: {
+      enabled: false,
+      threshold: 0.18,
+      analyser: null,
+      micStream: null,
+      silenceTimer: null,
+      animFrame: null
+    },
+
     // SOS Beacon
     sos: {
       active: false,
@@ -330,7 +363,6 @@
     }
   };
 
-  localStorage.setItem('mesh_peer_id', state.self.id);
   localStorage.setItem('mesh_peer_name', state.self.name);
   if (state.theme === 'dark') document.body.classList.add('dark-theme');
 
@@ -347,12 +379,11 @@
     roomPassphraseInput: document.getElementById('room-passphrase-input'),
     btnSaveEncryption: document.getElementById('btn-save-encryption'),
     
-    // Desktop Nav
+    // View Tabs
     tabBtnChat: document.getElementById('tab-btn-chat'),
     tabBtnMap: document.getElementById('tab-btn-map'),
     tabBtnPtt: document.getElementById('tab-btn-ptt'),
     
-    // Mobile Bottom Nav
     mobTabChat: document.getElementById('mob-tab-chat'),
     mobTabMap: document.getElementById('mob-tab-map'),
     mobTabPtt: document.getElementById('mob-tab-ptt'),
@@ -360,10 +391,26 @@
     sidebarBackdrop: document.getElementById('sidebar-backdrop'),
     btnCloseSidebar: document.getElementById('btn-close-sidebar'),
 
-    // View Panes
     viewPaneChat: document.getElementById('view-pane-chat'),
     viewPaneMap: document.getElementById('view-pane-map'),
     viewPanePtt: document.getElementById('view-pane-ptt'),
+
+    // AI Survival Assistant
+    btnOpenAi: document.getElementById('btn-open-ai'),
+    aiModalOverlay: document.getElementById('ai-modal-overlay'),
+    aiModalCloseBtn: document.getElementById('ai-modal-close-btn'),
+    aiChatHistory: document.getElementById('ai-chat-history'),
+    aiInputForm: document.getElementById('ai-input-form'),
+    aiUserQuery: document.getElementById('ai-user-query'),
+
+    // Geofence
+    btnOpenGeofence: document.getElementById('btn-open-geofence'),
+    geofenceModalOverlay: document.getElementById('geofence-modal-overlay'),
+    geofenceModalCloseBtn: document.getElementById('geofence-modal-close-btn'),
+    geofenceSlider: document.getElementById('geofence-slider'),
+    geofenceRadiusLabel: document.getElementById('geofence-radius-label'),
+    geofenceActiveToggle: document.getElementById('geofence-active-toggle'),
+    btnSaveGeofence: document.getElementById('btn-save-geofence'),
 
     // SOS & Survival
     btnSosBeacon: document.getElementById('btn-sos-beacon'),
@@ -426,24 +473,39 @@
     btnShareLocation: document.getElementById('btn-share-location'),
     sendMessageBtn: document.getElementById('send-message-btn'),
     
-    // Map View
+    // Map View & Compass HUD
     offlineMapCanvas: document.getElementById('offline-map-canvas'),
     mapGpsStatus: document.getElementById('map-gps-status'),
+    mapCompassHeading: document.getElementById('map-compass-heading'),
+    mapElevationStat: document.getElementById('map-elevation-stat'),
     mapTrailPoints: document.getElementById('map-trail-points'),
-    mapPeerCount: document.getElementById('map-peer-count'),
     btnDropWaypoint: document.getElementById('btn-drop-waypoint'),
     btnRecenterMap: document.getElementById('btn-recenter-map'),
+    btnToggleElevationPanel: document.getElementById('btn-toggle-elevation-panel'),
+    elevationPanel: document.getElementById('elevation-panel'),
+    elevationCanvas: document.getElementById('elevation-canvas'),
+    btnCloseElev: document.getElementById('btn-close-elev'),
+    elevGainStat: document.getElementById('elev-gain-stat'),
+    stormProbStat: document.getElementById('storm-prob-stat'),
+    weatherRiskPill: document.getElementById('weather-risk-pill'),
+    peerGuideRadar: document.getElementById('peer-guide-radar'),
+    guideArrow: document.getElementById('guide-arrow'),
+    guideText: document.getElementById('guide-text'),
     waypointModalOverlay: document.getElementById('waypoint-modal-overlay'),
     waypointModalCloseBtn: document.getElementById('waypoint-modal-close-btn'),
     waypointNameInput: document.getElementById('waypoint-name-input'),
     btnConfirmWaypoint: document.getElementById('btn-confirm-waypoint'),
     waypointIconPalette: document.getElementById('waypoint-icon-palette'),
 
-    // PTT View
+    // PTT & VOX View
     btnPttGiant: document.getElementById('btn-ptt-giant'),
     pttBtnLabel: document.getElementById('ptt-btn-label'),
     pttRingPulse: document.getElementById('ptt-ring-pulse'),
     btnToggleMicLock: document.getElementById('btn-toggle-mic-lock'),
+    btnToggleVox: document.getElementById('btn-toggle-vox'),
+    voxMeterContainer: document.getElementById('vox-meter-container'),
+    voxMeterFill: document.getElementById('vox-meter-fill'),
+    voxStateLabel: document.getElementById('vox-state-label'),
     pttLogList: document.getElementById('ptt-log-list'),
 
     // Sketch Modal
@@ -488,12 +550,10 @@
   function switchView(viewName) {
     state.activeView = viewName;
     
-    // Desktop Nav
     if (elements.tabBtnChat) elements.tabBtnChat.classList.toggle('active', viewName === 'chat');
     if (elements.tabBtnMap) elements.tabBtnMap.classList.toggle('active', viewName === 'map');
     if (elements.tabBtnPtt) elements.tabBtnPtt.classList.toggle('active', viewName === 'ptt');
 
-    // Mobile Bottom Nav
     if (elements.mobTabChat) elements.mobTabChat.classList.toggle('active', viewName === 'chat');
     if (elements.mobTabMap) elements.mobTabMap.classList.toggle('active', viewName === 'map');
     if (elements.mobTabPtt) elements.mobTabPtt.classList.toggle('active', viewName === 'ptt');
@@ -503,7 +563,10 @@
     elements.viewPanePtt.style.display = viewName === 'ptt' ? 'flex' : 'none';
 
     closeSidebarDrawer();
-    if (viewName === 'map') resizeAndDrawMap();
+    if (viewName === 'map') {
+      resizeAndDrawMap();
+      renderElevationProfile();
+    }
   }
 
   function toggleAppearance() {
@@ -523,7 +586,7 @@
     elements.sidebarBackdrop.classList.remove('active');
   }
 
-  // --- 7. Apple-Style Battery Telemetry Widget ---
+  // --- 7. Apple-Style Battery Capsule Widget ---
   async function initBatteryMonitor() {
     if ('getBattery' in navigator) {
       try {
@@ -555,7 +618,371 @@
     }
   }
 
-  // --- 8. Emergency SOS Beacon & Strobe Engine ---
+  // --- 8. 🧭 360° Digital Compass & Peer Direction Guidance ---
+  function initCompassSensor() {
+    if ('DeviceOrientationEvent' in window) {
+      const handleOrientation = (e) => {
+        let heading = 0;
+        if (e.webkitCompassHeading) {
+          heading = e.webkitCompassHeading;
+        } else if (e.alpha) {
+          heading = 360 - e.alpha;
+        }
+        state.myHeading = Math.round(heading);
+        updateCompassDisplay();
+      };
+
+      if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+        window.addEventListener('click', () => {
+          DeviceOrientationEvent.requestPermission()
+            .then(res => {
+              if (res === 'granted') window.addEventListener('deviceorientation', handleOrientation);
+            })
+            .catch(() => {});
+        }, { once: true });
+      } else {
+        window.addEventListener('deviceorientation', handleOrientation);
+      }
+    }
+  }
+
+  function updateCompassDisplay() {
+    const deg = state.myHeading;
+    const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+    const idx = Math.round(deg / 22.5) % 16;
+    const cardinal = directions[idx];
+
+    elements.mapCompassHeading.textContent = `${String(deg).padStart(3, '0')}° ${cardinal}`;
+
+    // Target Peer Guidance Radar
+    if (state.activeTargetId && state.activeTargetId !== 'broadcast' && state.myCoords) {
+      const targetLoc = state.peerLocations.get(state.activeTargetId);
+      if (targetLoc && targetLoc.coords) {
+        const rawBearing = calculateRawBearing(state.myCoords.latitude, state.myCoords.longitude, targetLoc.coords.latitude, targetLoc.coords.longitude);
+        const relativeBearing = (rawBearing - state.myHeading + 360) % 360;
+        const distStr = calculateDistance(state.myCoords.latitude, state.myCoords.longitude, targetLoc.coords.latitude, targetLoc.coords.longitude);
+
+        elements.peerGuideRadar.style.display = 'flex';
+        elements.guideArrow.style.transform = `rotate(${relativeBearing}deg)`;
+        elements.guideText.textContent = `${targetLoc.name || 'Peer'}: ${distStr} (${Math.round(rawBearing)}°)`;
+      } else {
+        elements.peerGuideRadar.style.display = 'none';
+      }
+    } else {
+      elements.peerGuideRadar.style.display = 'none';
+    }
+  }
+
+  function calculateRawBearing(lat1, lon1, lat2, lon2) {
+    const y = Math.sin((lon2 - lon1) * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180);
+    const x = Math.cos(lat1 * Math.PI / 180) * Math.sin(lat2 * Math.PI / 180) -
+              Math.sin(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.cos((lon2 - lon1) * Math.PI / 180);
+    const θ = Math.atan2(y, x);
+    return (θ * 180 / Math.PI + 360) % 360;
+  }
+
+  // --- 9. 🤖 100% Offline AI Survival Assistant (Neural Pattern Reasoner) ---
+  const OFFLINE_AI_KNOWLEDGE = [
+    {
+      keywords: ['snake', 'bite', 'viper', 'rattlesnake', 'cobra', 'venom'],
+      title: 'Snake / Venomous Bite Protocol',
+      response: '1. **Keep Victim Calm**: Minimize movement to slow venom circulation in the bloodstream.\n2. **Position Limb**: Keep the bite site **below heart level**.\n3. **DO NOT**: Cut the wound, suck venom, apply ice, or use a tight tourniquet.\n4. **Mark Swelling**: Use a pen to outline the swelling border and write the exact time.\n5. **Immobilize**: Splint the limb gently and prepare for immediate evacuation.'
+    },
+    {
+      keywords: ['water', 'purify', 'boil', 'filter', 'muddy', 'drink', 'hydration'],
+      title: 'Wilderness Water Purification',
+      response: '1. **Rolling Boil**: Boil vigorously for **at least 1 full minute** (3 minutes if above 2,000m elevation).\n2. **Solar SODIS**: Fill clear PET plastic bottles and expose to direct sunlight on a reflective surface for 6 hours.\n3. **DIY Sand/Charcoal Filter**: Layer cotton cloth -> crushed wood charcoal -> fine sand -> coarse gravel to remove sediment before boiling.'
+    },
+    {
+      keywords: ['hypothermia', 'cold', 'freeze', 'shivering', 'frostbite'],
+      title: 'Hypothermia & Cold Exposure',
+      response: '1. **Insulate Ground**: Cold ground drains 50x more heat than air. Put backpacks/pine branches beneath the patient.\n2. **Replace Wet Clothes**: Strip wet gear immediately and wrap in dry sleeping bags/space blankets.\n3. **Core Heat**: Apply warm bottles or body heat to **chest, neck, and armpits** (never directly to cold extremities).\n4. **Warm Sips**: Offer warm, sugary liquids if conscious. Never give alcohol or caffeine.'
+    },
+    {
+      keywords: ['fire', 'wet', 'rain', 'tinder', 'spark', 'flint', 'kindling'],
+      title: 'Building Fire in Wet Conditions',
+      response: '1. **Dry Core Wood**: Shave the outer wet bark off dead tree branches; the center wood is bone-dry.\n2. **Pine Resin / Fatwood**: Look for dead pine stumps dripping sticky pitch—it catches fire even underwater.\n3. **Platform**: Build a wooden base so your tinder does not touch damp ground.\n4. **Feather Sticks**: Shave thin curls along a dry branch to maximize surface area for sparks.'
+    },
+    {
+      keywords: ['bear', 'grizzly', 'wildlife', 'animal', 'wolf', 'cougar', 'lion'],
+      title: 'Dangerous Wildlife Encounters',
+      response: '1. **Black Bear**: Make yourself look huge, yell aggressively, make loud metal clangs. Do not run or climb trees.\n2. **Grizzly / Brown Bear**: Speak in a calm low voice, do NOT make direct eye contact. Back away slowly. If charged, drop flat on your stomach, interlace fingers behind neck, and spread legs.\n3. **Cougar / Mountain Lion**: Never turn your back or crouch. Maintain intense eye contact, raise your arms, and throw rocks.'
+    },
+    {
+      keywords: ['plant', 'edible', 'food', 'eat', 'berry', 'berries', 'mushroom'],
+      title: 'Wild Foraging & Universal Edibility Test',
+      response: '1. **Golden Rule**: Never eat wild mushrooms or white/yellow berries in survival scenarios.\n2. **Safe Plants**: Pine needles (steep in hot water for Vitamin C), young Dandelion leaves, Cattail roots (boil or roast), inner pine bark (cambium layer).\n3. **Edibility Test**: Rub plant on inner wrist -> wait 8 hrs -> touch to outer lip -> wait 8 hrs -> chew small bite without swallowing. If no burning/nausea, it is safer.'
+    },
+    {
+      keywords: ['shelter', 'debris', 'snow', 'bivouac', 'wind', 'tarp'],
+      title: 'Emergency Survival Shelters',
+      response: '1. **Debris Hut**: Lean a 3-meter ridgepole against a sturdy tree stump at 45°. Layer ribs across sides, then pile 2–3 feet of dry leaves and pine needles for insulation.\n2. **Snow Trench**: Dig a trench 1 meter deep in snow, lay branches and tarp across the top, and shovel snow over it.\n3. **Orientation**: Always face the entrance 90° away from prevailing winds.'
+    }
+  ];
+
+  function queryOfflineAiAssistant(userPrompt) {
+    const p = userPrompt.toLowerCase().trim();
+    if (!p) return;
+
+    appendAiBubble('user', userPrompt);
+    elements.aiUserQuery.value = '';
+
+    // Search intelligent corpus
+    let bestMatch = null;
+    let maxHits = 0;
+
+    OFFLINE_AI_KNOWLEDGE.forEach(k => {
+      let hits = 0;
+      k.keywords.forEach(kw => {
+        if (p.includes(kw)) hits++;
+      });
+      if (hits > maxHits) {
+        maxHits = hits;
+        bestMatch = k;
+      }
+    });
+
+    setTimeout(() => {
+      if (bestMatch && maxHits > 0) {
+        const html = `<strong>${escapeHtml(bestMatch.title)}</strong><br><br>${formatAiText(bestMatch.response)}`;
+        appendAiBubble('assistant', html);
+      } else {
+        const fallback = `<strong>Survival Guidance</strong><br><br>I evaluated your question: <em>"${escapeHtml(userPrompt)}"</em>.<br><br>• <strong>Primary Priorities</strong>: Security -> Warmth/Shelter -> Water -> Rescue Signaling -> Food.<br>• For detailed medical, water, or shelter instructions, check the <strong>Wilderness Survival Handbook (Book Icon)</strong> in the top header!`;
+        appendAiBubble('assistant', fallback);
+      }
+      elements.aiChatHistory.scrollTop = elements.aiChatHistory.scrollHeight;
+    }, 280);
+  }
+
+  function appendAiBubble(role, content) {
+    const div = document.createElement('div');
+    div.className = `ai-bubble ${role}`;
+    div.innerHTML = `
+      <div class="ai-name-tag">${role === 'user' ? 'You' : '🤖 Survival AI'}</div>
+      <div>${content}</div>
+    `;
+    elements.aiChatHistory.appendChild(div);
+    elements.aiChatHistory.scrollTop = elements.aiChatHistory.scrollHeight;
+  }
+
+  function formatAiText(txt) {
+    return txt
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\n/g, '<br>');
+  }
+
+  // --- 10. 🚨 Geofencing & Lost Hiker Proximity Alarm ---
+  function checkGeofenceProximity(myLat, myLon) {
+    if (!state.geofence.enabled) return;
+
+    let centerLat = state.geofence.originCoords ? state.geofence.originCoords.latitude : null;
+    let centerLon = state.geofence.originCoords ? state.geofence.originCoords.longitude : null;
+
+    // Default center is the first recorded point
+    if (!centerLat && state.myTrail.length > 0) {
+      centerLat = state.myTrail[0].lat;
+      centerLon = state.myTrail[0].lon;
+      state.geofence.originCoords = { latitude: centerLat, longitude: centerLon };
+    }
+
+    if (!centerLat) return;
+
+    const R = 6371e3;
+    const φ1 = centerLat * Math.PI / 180;
+    const φ2 = myLat * Math.PI / 180;
+    const Δφ = (myLat - centerLat) * Math.PI / 180;
+    const Δλ = (myLon - centerLon) * Math.PI / 180;
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const d = R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+
+    const maxR = state.geofence.radiusMeters;
+    const now = Date.now();
+
+    if (d > maxR && (now - state.geofence.lastAlertTime > 20000)) {
+      state.geofence.lastAlertTime = now;
+      playSound('geofence_alarm');
+      
+      const alertMsg = `⚠️ GEOFENCE PERIMETER BREACH: You are ${Math.round(d)}m away from group base (limit: ${maxR}m)!`;
+      alert(alertMsg);
+
+      if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+        state.ws.send(JSON.stringify({
+          type: 'GEOFENCE_ALERT',
+          senderName: state.self.name,
+          distance: Math.round(d),
+          maxRadius: maxR,
+          coords: state.myCoords
+        }));
+      }
+    }
+  }
+
+  function handleIncomingGeofenceAlert(data) {
+    playSound('geofence_alarm');
+    alert(`🚨 LOST HIKER ALERT: ${data.senderName} has wandered ${data.distance}m away (exceeding ${data.maxRadius}m perimeter)!`);
+  }
+
+  function saveGeofenceSettings() {
+    state.geofence.radiusMeters = parseInt(elements.geofenceSlider.value, 10);
+    state.geofence.enabled = elements.geofenceActiveToggle.checked;
+    
+    if (state.myCoords) {
+      state.geofence.originCoords = state.myCoords;
+    }
+
+    localStorage.setItem('mesh_geofence_radius', state.geofence.radiusMeters);
+    localStorage.setItem('mesh_geofence_enabled', state.geofence.enabled);
+
+    elements.geofenceModalOverlay.classList.remove('active');
+    alert(`Geofence perimeter set to ${state.geofence.radiusMeters}m (${state.geofence.enabled ? 'ACTIVE' : 'DISABLED'}).`);
+    if (state.activeView === 'map') drawMap();
+  }
+
+  // --- 11. 🎙️ VOX Hands-Free Voice-Activated Walkie-Talkie ---
+  async function toggleVoxMode() {
+    state.vox.enabled = !state.vox.enabled;
+    elements.btnToggleVox.classList.toggle('active', state.vox.enabled);
+    elements.btnToggleVox.querySelector('span').textContent = state.vox.enabled ? '🎙️ VOX Hands-Free: ON' : '🎙️ VOX Hands-Free: OFF';
+    elements.voxMeterContainer.style.display = state.vox.enabled ? 'flex' : 'none';
+
+    if (state.vox.enabled) {
+      await startVoxAudioAnalysis();
+    } else {
+      stopVoxAudioAnalysis();
+    }
+  }
+
+  async function startVoxAudioAnalysis() {
+    try {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      state.vox.micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const src = audioCtx.createMediaStreamSource(state.vox.micStream);
+      state.vox.analyser = audioCtx.createAnalyser();
+      state.vox.analyser.fftSize = 256;
+      src.connect(state.vox.analyser);
+
+      const buffer = new Uint8Array(state.vox.analyser.frequencyBinCount);
+
+      const checkVolume = () => {
+        if (!state.vox.enabled) return;
+        state.vox.analyser.getByteFrequencyData(buffer);
+        
+        let sum = 0;
+        for (let i = 0; i < buffer.length; i++) sum += buffer[i];
+        const avg = sum / buffer.length;
+        const normalized = Math.min(1, avg / 80);
+
+        elements.voxMeterFill.style.width = `${normalized * 100}%`;
+
+        // VOX Voice Activation
+        if (normalized > state.vox.threshold) {
+          if (!state.ptt.isTransmitting) {
+            elements.voxStateLabel.textContent = 'Voice Detected! Transmitting...';
+            startPttTransmission();
+          }
+          if (state.vox.silenceTimer) {
+            clearTimeout(state.vox.silenceTimer);
+            state.vox.silenceTimer = null;
+          }
+        } else if (state.ptt.isTransmitting && !state.vox.silenceTimer) {
+          elements.voxStateLabel.textContent = 'Silence hang-time...';
+          state.vox.silenceTimer = setTimeout(() => {
+            if (state.ptt.isTransmitting && !state.ptt.isLocked) {
+              stopPttTransmission();
+              elements.voxStateLabel.textContent = 'Listening...';
+            }
+            state.vox.silenceTimer = null;
+          }, 1100);
+        }
+
+        state.vox.animFrame = requestAnimationFrame(checkVolume);
+      };
+
+      checkVolume();
+    } catch (e) {
+      alert('Microphone access is required for VOX Hands-Free.');
+      state.vox.enabled = false;
+      elements.btnToggleVox.classList.remove('active');
+      elements.btnToggleVox.querySelector('span').textContent = '🎙️ VOX Hands-Free: OFF';
+      elements.voxMeterContainer.style.display = 'none';
+    }
+  }
+
+  function stopVoxAudioAnalysis() {
+    if (state.vox.animFrame) cancelAnimationFrame(state.vox.animFrame);
+    if (state.vox.micStream) state.vox.micStream.getTracks().forEach(t => t.stop());
+    if (state.ptt.isTransmitting && !state.ptt.isLocked) stopPttTransmission();
+  }
+
+  // --- 12. ⛰️ Elevation Profile & Storm Risk Predictor ---
+  function recordElevation(alt) {
+    if (typeof alt !== 'number' || isNaN(alt)) return;
+    const rounded = Math.round(alt);
+    elements.mapElevationStat.textContent = `${rounded} m`;
+
+    const last = state.elevationHistory[state.elevationHistory.length - 1];
+    if (!last || Math.abs(last.alt - rounded) >= 2 || (Date.now() - last.time > 15000)) {
+      state.elevationHistory.push({ alt: rounded, time: Date.now() });
+      if (state.elevationHistory.length > 80) state.elevationHistory.shift();
+      localStorage.setItem('mesh_elevation_history', JSON.stringify(state.elevationHistory));
+      renderElevationProfile();
+    }
+  }
+
+  function renderElevationProfile() {
+    if (!elements.elevationCanvas) return;
+    const ctx = elements.elevationCanvas.getContext('2d');
+    const w = elements.elevationCanvas.width;
+    const h = elements.elevationCanvas.height;
+
+    ctx.clearRect(0, 0, w, h);
+
+    if (state.elevationHistory.length < 2) {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.font = '11px sans-serif';
+      ctx.fillText('Walking elevation trail graph logging...', 20, h / 2);
+      return;
+    }
+
+    const alts = state.elevationHistory.map(e => e.alt);
+    const minAlt = Math.min(...alts);
+    const maxAlt = Math.max(...alts);
+    const range = Math.max(10, maxAlt - minAlt);
+
+    ctx.beginPath();
+    ctx.moveTo(0, h);
+
+    state.elevationHistory.forEach((pt, i) => {
+      const x = (i / (state.elevationHistory.length - 1)) * w;
+      const y = h - ((pt.alt - minAlt) / range) * (h - 20) - 10;
+      ctx.lineTo(x, y);
+    });
+
+    ctx.lineTo(w, h);
+    ctx.closePath();
+
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, 'rgba(0, 122, 255, 0.6)');
+    grad.addColorStop(1, 'rgba(0, 122, 255, 0.05)');
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.strokeStyle = '#007aff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Ascent stats
+    const ascent = Math.max(0, maxAlt - minAlt);
+    elements.elevGainStat.textContent = `Ascent: +${ascent}m (Max: ${maxAlt}m)`;
+
+    // Mountain Storm Risk Predictor
+    const stormRisk = ascent > 400 ? 'Moderate (Altitude Front)' : 'Low';
+    elements.stormProbStat.textContent = `Storm Risk: ${stormRisk}`;
+    elements.weatherRiskPill.textContent = stormRisk === 'Low' ? '⛅ Fair Weather' : '⛈️ Barometric Front';
+    elements.weatherRiskPill.classList.toggle('warning', stormRisk !== 'Low');
+  }
+
+  // --- 13. Emergency SOS Beacon & Strobe Engine ---
   async function activateSosBeacon() {
     state.sos.active = true;
     elements.sosModalOverlay.classList.add('active');
@@ -634,7 +1061,7 @@
     }
   }
 
-  // --- 9. Offline Wilderness First-Aid & Survival Handbook ---
+  // --- 14. Offline Wilderness First-Aid & Survival Handbook ---
   const SURVIVAL_GUIDES = [
     {
       cat: 'firstaid',
@@ -649,7 +1076,7 @@
     {
       cat: 'firstaid',
       title: 'Hypothermia & Cold Shock Treatment',
-      body: 'Move out of wind/wet. Replace wet clothes with dry layers. Insulate patient from cold ground with pack/branches. Apply gentle warmth to chest and armpits. Give warm sweet drinks if conscious.'
+      body: 'Move out of wind/wet. Replace wet clothes with dry layers. Insulate patient from cold ground with pack/branches. Apply core heat to chest and armpits. Give warm sweet drinks if conscious.'
     },
     {
       cat: 'firstaid',
@@ -706,7 +1133,7 @@
     });
   }
 
-  // --- 10. Safety Roll Call Check-In Engine (De-duplicated) ---
+  // --- 15. Safety Roll Call Check-In Engine ---
   function startRollCall() {
     elements.rollcallModalOverlay.classList.add('active');
     elements.rollcallPromptSubtitle.textContent = 'You started a safety roll call';
@@ -769,7 +1196,7 @@
     `;
   }
 
-  // --- 11. WebSocket Resilient Mesh Hub Client ---
+  // --- 16. WebSocket Resilient Mesh Hub Client ---
   let reconnectTimer = null;
   let clientHeartbeatInterval = null;
 
@@ -798,7 +1225,6 @@
         peer: state.self
       }));
 
-      // Active client heartbeat & sync every 5 seconds
       if (clientHeartbeatInterval) clearInterval(clientHeartbeatInterval);
       clientHeartbeatInterval = setInterval(() => {
         if (state.ws && state.ws.readyState === WebSocket.OPEN) {
@@ -842,7 +1268,6 @@
     }, 1500);
   }
 
-  // Auto-reconnect immediately when user unlocks screen, wakes phone, or focuses tab
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
       if (!state.ws || state.ws.readyState !== WebSocket.OPEN) {
@@ -897,6 +1322,7 @@
           state.peerLocations.delete(data.peerId);
           state.peerBatteries.delete(data.peerId);
           updateMapStats();
+          updateCompassDisplay();
           if (state.call.targetPeerId === data.peerId) endCall(false);
         }
         break;
@@ -920,6 +1346,10 @@
         handleIncomingSosAlert(data);
         break;
 
+      case 'GEOFENCE_ALERT':
+        handleIncomingGeofenceAlert(data);
+        break;
+
       case 'ROLL_CALL_START':
         handleIncomingRollCallStart(data);
         break;
@@ -940,6 +1370,7 @@
           timestamp: data.timestamp
         });
         updateMapStats();
+        updateCompassDisplay();
         if (state.activeView === 'map') drawMap();
         break;
 
@@ -982,7 +1413,7 @@
     }
   }
 
-  // --- 12. Walkie-Talkie Push-to-Talk (PTT) Touch & Mobile Optimized ---
+  // --- 17. Walkie-Talkie Push-to-Talk (PTT) Touch & Compressed Audio ---
   let pttSelectedIcon = '⛺';
 
   async function startPttTransmission() {
@@ -1055,7 +1486,7 @@
       elements.btnToggleMicLock.querySelector('span').textContent = '🔴 Mic Locked (Tap to Stop)';
       startPttTransmission();
     } else {
-      elements.btnToggleMicLock.querySelector('span').textContent = '🔒 Tap to Lock Mic (Hands-Free)';
+      elements.btnToggleMicLock.querySelector('span').textContent = '🔒 Tap to Lock Mic';
       stopPttTransmission();
     }
   }
@@ -1084,7 +1515,7 @@
     elements.pttLogList.prepend(item);
   }
 
-  // --- 13. Offline GPS Map Canvas Engine ---
+  // --- 18. GPS Map Engine, Breadcrumbs & Geofence Boundary ---
   let mapCanvasCtx = null;
 
   function initMapEngine() {
@@ -1104,6 +1535,10 @@
           heading: pos.coords.heading || 0
         };
 
+        if (pos.coords.altitude) {
+          recordElevation(pos.coords.altitude);
+        }
+
         const last = state.myTrail[state.myTrail.length - 1];
         if (!last || Math.abs(last.lat - state.myCoords.latitude) > 0.0001 || Math.abs(last.lon - state.myCoords.longitude) > 0.0001) {
           state.myTrail.push({
@@ -1115,6 +1550,10 @@
           localStorage.setItem('mesh_my_trail', JSON.stringify(state.myTrail));
         }
 
+        // Check Geofence
+        checkGeofenceProximity(state.myCoords.latitude, state.myCoords.longitude);
+
+        // Throttled GPS Broadcast (once per 3.5s)
         const now = Date.now();
         if (!state._lastGpsBroadcast || now - state._lastGpsBroadcast > 3500) {
           state._lastGpsBroadcast = now;
@@ -1128,6 +1567,7 @@
         }
 
         updateMapStats();
+        updateCompassDisplay();
         if (state.activeView === 'map') drawMap();
       },
       (err) => {
@@ -1139,8 +1579,7 @@
   }
 
   function updateMapStats() {
-    elements.mapTrailPoints.textContent = `${state.myTrail.length} Points`;
-    elements.mapPeerCount.textContent = `${state.peerLocations.size} Peers`;
+    elements.mapTrailPoints.textContent = `${state.myTrail.length} pts`;
     if (state.myCoords) {
       elements.mapGpsStatus.textContent = `Fix (${state.myCoords.latitude.toFixed(4)}, ${state.myCoords.longitude.toFixed(4)})`;
       elements.mapGpsStatus.classList.add('active');
@@ -1201,6 +1640,28 @@
     const toCanvasX = (lon) => centerX + (lon - refLon) * scale;
     const toCanvasY = (lat) => centerY - (lat - refLat) * scale;
 
+    // Render Geofence Boundary Ring
+    if (state.geofence.enabled && state.geofence.originCoords) {
+      const gcx = toCanvasX(state.geofence.originCoords.longitude);
+      const gcy = toCanvasY(state.geofence.originCoords.latitude);
+      const pixelRadius = (state.geofence.radiusMeters / 100) * 80;
+
+      mapCanvasCtx.beginPath();
+      mapCanvasCtx.arc(gcx, gcy, pixelRadius, 0, Math.PI * 2);
+      mapCanvasCtx.fillStyle = 'rgba(255, 59, 48, 0.08)';
+      mapCanvasCtx.fill();
+      mapCanvasCtx.strokeStyle = 'rgba(255, 59, 48, 0.6)';
+      mapCanvasCtx.lineWidth = 2;
+      mapCanvasCtx.setLineDash([6, 6]);
+      mapCanvasCtx.stroke();
+      mapCanvasCtx.setLineDash([]);
+
+      mapCanvasCtx.font = '10px sans-serif';
+      mapCanvasCtx.fillStyle = '#ff3b30';
+      mapCanvasCtx.fillText(`Perimeter (${state.geofence.radiusMeters}m)`, gcx - 30, gcy - pixelRadius - 6);
+    }
+
+    // Breadcrumbs
     if (state.myTrail.length > 1) {
       mapCanvasCtx.beginPath();
       mapCanvasCtx.strokeStyle = '#34c759';
@@ -1217,6 +1678,7 @@
       mapCanvasCtx.setLineDash([]);
     }
 
+    // Waypoints
     state.waypoints.forEach(wp => {
       const cx = toCanvasX(wp.lon);
       const cy = toCanvasY(wp.lat);
@@ -1229,6 +1691,7 @@
       mapCanvasCtx.fillText(wp.name, cx - 18, cy + 22);
     });
 
+    // Remote Peers
     state.peerLocations.forEach((peer, peerId) => {
       if (peerId === state.self.id || !peer.coords) return;
       const px = toCanvasX(peer.coords.longitude);
@@ -1251,6 +1714,22 @@
       mapCanvasCtx.fillStyle = '#ff9500';
       mapCanvasCtx.fillText(peer.name || 'Peer', px + 10, py + 4);
     });
+
+    // Self Position with Compass Direction Cone
+    mapCanvasCtx.save();
+    mapCanvasCtx.translate(centerX, centerY);
+    mapCanvasCtx.rotate(state.myHeading * Math.PI / 180);
+
+    mapCanvasCtx.beginPath();
+    mapCanvasCtx.moveTo(0, -22);
+    mapCanvasCtx.lineTo(14, 10);
+    mapCanvasCtx.lineTo(0, 4);
+    mapCanvasCtx.lineTo(-14, 10);
+    mapCanvasCtx.closePath();
+    mapCanvasCtx.fillStyle = 'rgba(0, 122, 255, 0.4)';
+    mapCanvasCtx.fill();
+
+    mapCanvasCtx.restore();
 
     mapCanvasCtx.beginPath();
     mapCanvasCtx.arc(centerX, centerY, 8, 0, Math.PI * 2);
@@ -1302,7 +1781,7 @@
     if (state.activeView === 'map') drawMap();
   }
 
-  // --- 14. Peer List Rendering & Sleek Battery Badges ---
+  // --- 19. Peer List Rendering & Battery Badges ---
   function getInitials(name) {
     if (!name) return 'U';
     const parts = name.trim().split(/\s+/);
@@ -1342,6 +1821,8 @@
       div.addEventListener('click', () => selectChatTarget(peer.id));
       elements.peerList.appendChild(div);
     });
+
+    updateCompassDisplay();
   }
 
   function selectChatTarget(targetId) {
@@ -1376,10 +1857,11 @@
     }
 
     renderMessagesForActiveTarget();
+    updateCompassDisplay();
     closeSidebarDrawer();
   }
 
-  // --- 15. Distance & Bearing Calculations ---
+  // --- 20. Distance & Bearing ---
   function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371e3;
     const φ1 = lat1 * Math.PI / 180;
@@ -1406,7 +1888,7 @@
     return directions[idx];
   }
 
-  // --- 16. Message Rendering & History ---
+  // --- 21. Message Rendering & History ---
   function appendMessage(msg, isSelf = false) {
     if (!msg.reactions) msg.reactions = {};
     
@@ -1700,7 +2182,7 @@
     );
   }
 
-  // --- 17. Freeform Sketch Canvas ---
+  // --- 22. Freeform Sketch Pad ---
   let canvasCtx = null;
 
   function initSketchCanvas() {
@@ -1798,7 +2280,7 @@
     await dispatchMessage(msg);
   }
 
-  // --- 18. Export Transcript ---
+  // --- 23. Export Transcript ---
   async function exportChatTranscript() {
     const allMsgs = await loadStoredMessages();
     if (allMsgs.length === 0) {
@@ -1830,7 +2312,7 @@
     URL.revokeObjectURL(url);
   }
 
-  // --- 19. Message Dispatch Helper ---
+  // --- 24. Message Dispatch Helper ---
   async function dispatchMessage(msgObj) {
     if (state.replyingTo) {
       msgObj.quotedMsg = state.replyingTo;
@@ -1848,7 +2330,7 @@
     }
   }
 
-  // --- 20. Voice Note Recording ---
+  // --- 25. Voice Memo Recording ---
   async function toggleVoiceRecording() {
     if (!state.isRecording) {
       try {
@@ -1920,7 +2402,7 @@
     };
   }
 
-  // --- 21. File & Photo Sharing ---
+  // --- 26. File & Photo Sharing ---
   function handleFileSelect(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -1969,7 +2451,7 @@
     elements.chatMessageInput.value = '';
   }
 
-  // --- 22. WebRTC Audio & Video Calling Engine (STUN Supported) ---
+  // --- 27. WebRTC Audio & Video Calling Engine ---
   async function initiateCall(isVideo) {
     if (state.activeTargetId === 'broadcast') {
       alert('Please select a specific peer from the sidebar to start a call.');
@@ -2279,7 +2761,7 @@
     elements.btnCallVideoToggle.classList.remove('muted');
   }
 
-  // --- 23. Encryption & QR Modals ---
+  // --- 28. Encryption & QR Modals ---
   function openEncryptionModal() {
     elements.roomPassphraseInput.value = state.passphrase;
     elements.encryptionModalOverlay.classList.add('active');
@@ -2370,7 +2852,7 @@
     renderMessagesForActiveTarget();
   }
 
-  // --- 24. Event Listeners & Mobile PTT Touch Handlers ---
+  // --- 29. Event Listeners Initialization ---
   function initEventListeners() {
     // Desktop View Tabs
     if (elements.tabBtnChat) elements.tabBtnChat.addEventListener('click', () => switchView('chat'));
@@ -2386,6 +2868,46 @@
     // Sidebar Backdrop & Drawer Controls
     if (elements.sidebarBackdrop) elements.sidebarBackdrop.addEventListener('click', closeSidebarDrawer);
     if (elements.btnCloseSidebar) elements.btnCloseSidebar.addEventListener('click', closeSidebarDrawer);
+
+    // AI Survival Assistant
+    elements.btnOpenAi.addEventListener('click', () => {
+      elements.aiModalOverlay.classList.add('active');
+    });
+    elements.aiModalCloseBtn.addEventListener('click', () => {
+      elements.aiModalOverlay.classList.remove('active');
+    });
+    elements.aiInputForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      queryOfflineAiAssistant(elements.aiUserQuery.value);
+    });
+    document.querySelectorAll('.ai-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        queryOfflineAiAssistant(chip.dataset.prompt);
+      });
+    });
+
+    // Geofence Modal
+    elements.btnOpenGeofence.addEventListener('click', () => {
+      elements.geofenceSlider.value = state.geofence.radiusMeters;
+      elements.geofenceRadiusLabel.textContent = `${state.geofence.radiusMeters} meters`;
+      elements.geofenceActiveToggle.checked = state.geofence.enabled;
+      elements.geofenceModalOverlay.classList.add('active');
+    });
+    elements.geofenceModalCloseBtn.addEventListener('click', () => elements.geofenceModalOverlay.classList.remove('active'));
+    elements.geofenceSlider.addEventListener('input', (e) => {
+      elements.geofenceRadiusLabel.textContent = `${e.target.value} meters`;
+    });
+    elements.btnSaveGeofence.addEventListener('click', saveGeofenceSettings);
+
+    // Elevation & Weather Panel
+    elements.btnToggleElevationPanel.addEventListener('click', () => {
+      const isVisible = elements.elevationPanel.style.display === 'block';
+      elements.elevationPanel.style.display = isVisible ? 'none' : 'block';
+      if (!isVisible) renderElevationProfile();
+    });
+    elements.btnCloseElev.addEventListener('click', () => {
+      elements.elevationPanel.style.display = 'none';
+    });
 
     // Appearance Toggle
     elements.btnToggleTheme.addEventListener('click', toggleAppearance);
@@ -2447,41 +2969,39 @@
       });
     });
 
-    // Walkie-Talkie Mobile Touch & Mouse Handlers (Suppress Long-Press Context Menu)
+    // Walkie-Talkie Touch / Mouse Handlers
     const pttBtn = elements.btnPttGiant;
-    
-    // Prevent iOS / Android long-press selection & context menu
     pttBtn.addEventListener('contextmenu', (e) => e.preventDefault());
 
-    // Touch Event Listeners for Mobile
     pttBtn.addEventListener('touchstart', (e) => {
       e.preventDefault();
-      if (!state.ptt.isLocked) startPttTransmission();
+      if (!state.ptt.isLocked && !state.vox.enabled) startPttTransmission();
     }, { passive: false });
 
     pttBtn.addEventListener('touchend', (e) => {
       e.preventDefault();
-      if (!state.ptt.isLocked) stopPttTransmission();
+      if (!state.ptt.isLocked && !state.vox.enabled) stopPttTransmission();
     }, { passive: false });
 
     pttBtn.addEventListener('touchcancel', (e) => {
       e.preventDefault();
-      if (!state.ptt.isLocked) stopPttTransmission();
+      if (!state.ptt.isLocked && !state.vox.enabled) stopPttTransmission();
     }, { passive: false });
 
-    // Desktop Mouse / Pointer Listeners
     pttBtn.addEventListener('mousedown', (e) => {
       e.preventDefault();
-      if (!state.ptt.isLocked) startPttTransmission();
+      if (!state.ptt.isLocked && !state.vox.enabled) startPttTransmission();
     });
 
     window.addEventListener('mouseup', () => {
-      if (!state.ptt.isLocked && state.ptt.isTransmitting) stopPttTransmission();
+      if (!state.ptt.isLocked && !state.vox.enabled && state.ptt.isTransmitting) stopPttTransmission();
     });
 
-    // Hands-Free Mic Lock Button
     if (elements.btnToggleMicLock) {
       elements.btnToggleMicLock.addEventListener('click', toggleMicLock);
+    }
+    if (elements.btnToggleVox) {
+      elements.btnToggleVox.addEventListener('click', toggleVoxMode);
     }
 
     // Encryption Settings
@@ -2494,10 +3014,8 @@
     elements.btnClearSearch.addEventListener('click', clearSearch);
     elements.btnExportChat.addEventListener('click', exportChatTranscript);
 
-    // Reply Bar Cancel
     elements.btnCancelReply.addEventListener('click', cancelReply);
 
-    // Broadcast channel click
     const broadcastBtn = document.getElementById('peer-target-broadcast');
     if (broadcastBtn) {
       broadcastBtn.addEventListener('click', () => selectChatTarget('broadcast'));
@@ -2507,16 +3025,13 @@
     elements.btnAudioCall.addEventListener('click', () => initiateCall(false));
     elements.btnVideoCall.addEventListener('click', () => initiateCall(true));
 
-    // Incoming Call Actions
     elements.btnIncomingAccept.addEventListener('click', acceptIncomingCall);
     elements.btnIncomingDecline.addEventListener('click', rejectIncomingCall);
 
-    // In-Call Controls
     elements.btnCallMute.addEventListener('click', toggleCallMute);
     elements.btnCallVideoToggle.addEventListener('click', toggleCallVideo);
     elements.btnCallEnd.addEventListener('click', () => endCall(true));
 
-    // Profile name change
     elements.profileNameInput.addEventListener('change', (e) => {
       state.self.name = e.target.value.trim() || 'User';
       localStorage.setItem('mesh_peer_name', state.self.name);
@@ -2525,7 +3040,6 @@
       }
     });
 
-    // QR Modal
     elements.qrShareBtn.addEventListener('click', openQRModal);
     elements.qrModalCloseBtn.addEventListener('click', closeQRModal);
     elements.qrModalDoneBtn.addEventListener('click', closeQRModal);
@@ -2552,7 +3066,7 @@
     });
   }
 
-  // --- 25. Bootstrap ---
+  // --- 30. Bootstrap ---
   async function init() {
     elements.profileNameInput.value = state.self.name;
     elements.selfIdTag.textContent = `ID: ${state.self.id}`;
@@ -2568,6 +3082,7 @@
 
     initEventListeners();
     initMapEngine();
+    initCompassSensor();
     initBatteryMonitor();
     connectWebSocket();
 

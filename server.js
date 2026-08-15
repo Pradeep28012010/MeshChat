@@ -332,6 +332,20 @@ wss.on('connection', (ws, req) => {
           break;
         }
 
+        // Geofence & Lost Hiker Perimeter Alert
+        case 'GEOFENCE_ALERT': {
+          broadcast({
+            type: 'GEOFENCE_ALERT',
+            senderId: currentPeerId,
+            senderName: data.senderName,
+            distance: data.distance,
+            maxRadius: data.maxRadius,
+            coords: data.coords,
+            timestamp: Date.now()
+          });
+          break;
+        }
+
         // WebRTC Calling Signaling
         case 'CALL_INVITE':
         case 'CALL_ACCEPT':
