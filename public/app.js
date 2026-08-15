@@ -1,5 +1,6 @@
 /**
- * MeshChat — Zero-Internet Messaging, Calling, GPS Map, Walkie-Talkie & Wilderness Survival Suite
+ * MeshChat — Zero-Internet Messaging, Calling, GPS Map, Walkie-Talkie & Survival Suite
+ * Adaptive Mobile & Desktop Architecture
  */
 
 (function () {
@@ -70,11 +71,10 @@
     const playMorseSos = () => {
       if (audioCtx.state === 'suspended') audioCtx.resume();
       const now = audioCtx.currentTime;
-      // S: 3 short, O: 3 long, S: 3 short
       const pattern = [
-        { d: 0.1, p: 0.1 }, { d: 0.1, p: 0.1 }, { d: 0.1, p: 0.25 }, // S
-        { d: 0.3, p: 0.1 }, { d: 0.3, p: 0.1 }, { d: 0.3, p: 0.25 }, // O
-        { d: 0.1, p: 0.1 }, { d: 0.1, p: 0.1 }, { d: 0.1, p: 0.6 }   // S
+        { d: 0.1, p: 0.1 }, { d: 0.1, p: 0.1 }, { d: 0.1, p: 0.25 },
+        { d: 0.3, p: 0.1 }, { d: 0.3, p: 0.1 }, { d: 0.3, p: 0.25 },
+        { d: 0.1, p: 0.1 }, { d: 0.1, p: 0.1 }, { d: 0.1, p: 0.6 }
       ];
       let offset = 0;
       pattern.forEach(step => {
@@ -103,7 +103,6 @@
     }
   }
 
-  // Ringtone synthesizer loop
   let ringtoneTimer = null;
   function startRingtone() {
     stopRingtone();
@@ -136,7 +135,7 @@
     }
   }
 
-  // --- 2. End-to-End Encryption Manager (Web Crypto API AES-GCM 256-bit) ---
+  // --- 2. End-to-End Encryption Manager (AES-GCM 256-bit) ---
   let cryptoKey = null;
   const SALT = new Uint8Array([77, 101, 115, 104, 67, 104, 97, 116, 79, 102, 102, 108, 105, 110, 101, 49]);
 
@@ -211,7 +210,7 @@
     }
   }
 
-  // --- 3. IndexedDB Local Storage Manager ---
+  // --- 3. IndexedDB Storage ---
   const DB_NAME = 'MeshChatLocalDB';
   const DB_VERSION = 3;
   let db = null;
@@ -223,9 +222,6 @@
         const database = e.target.result;
         if (!database.objectStoreNames.contains('messages')) {
           database.createStore = database.createObjectStore('messages', { keyPath: 'id' });
-        }
-        if (!database.objectStoreNames.contains('outbox')) {
-          database.createObjectStore('outbox', { keyPath: 'id' });
         }
       };
       request.onsuccess = (e) => {
@@ -295,15 +291,16 @@
       torchTrack: null
     },
 
-    // PTT Walkie Talkie
+    // Walkie Talkie (PTT)
     ptt: {
       isTransmitting: false,
+      isLocked: false,
       recorder: null,
       chunks: [],
       stream: null
     },
 
-    // WebRTC Calling State
+    // WebRTC Calling
     call: {
       status: 'idle',
       targetPeerId: null,
@@ -320,7 +317,7 @@
       incomingData: null
     },
 
-    // Sketch Canvas State
+    // Sketch Canvas
     sketch: {
       isDrawing: false,
       color: '#000000',
@@ -332,10 +329,9 @@
 
   localStorage.setItem('mesh_peer_id', state.self.id);
   localStorage.setItem('mesh_peer_name', state.self.name);
-
   if (state.theme === 'dark') document.body.classList.add('dark-theme');
 
-  // --- 5. DOM Elements ---
+  // --- 5. DOM Elements Cache ---
   const elements = {
     connectionStatusDot: document.getElementById('connection-status-dot'),
     connectionStatusText: document.getElementById('connection-status-text'),
@@ -348,10 +344,20 @@
     roomPassphraseInput: document.getElementById('room-passphrase-input'),
     btnSaveEncryption: document.getElementById('btn-save-encryption'),
     
-    // Tab Navigation
+    // Desktop Nav
     tabBtnChat: document.getElementById('tab-btn-chat'),
     tabBtnMap: document.getElementById('tab-btn-map'),
     tabBtnPtt: document.getElementById('tab-btn-ptt'),
+    
+    // Mobile Bottom Nav
+    mobTabChat: document.getElementById('mob-tab-chat'),
+    mobTabMap: document.getElementById('mob-tab-map'),
+    mobTabPtt: document.getElementById('mob-tab-ptt'),
+    mobTabMenu: document.getElementById('mob-tab-menu'),
+    sidebarBackdrop: document.getElementById('sidebar-backdrop'),
+    btnCloseSidebar: document.getElementById('btn-close-sidebar'),
+
+    // View Panes
     viewPaneChat: document.getElementById('view-pane-chat'),
     viewPaneMap: document.getElementById('view-pane-map'),
     viewPanePtt: document.getElementById('view-pane-ptt'),
@@ -388,6 +394,8 @@
     selfIdTag: document.getElementById('self-id-tag'),
     selfAvatar: document.getElementById('self-avatar'),
     selfBatteryPill: document.getElementById('self-battery-pill'),
+    selfBatFill: document.getElementById('self-bat-fill'),
+    selfBatText: document.getElementById('self-bat-text'),
     
     // Chat Header & Messages
     activeChatTitle: document.getElementById('active-chat-title'),
@@ -405,7 +413,7 @@
     replySnippet: document.getElementById('reply-snippet'),
     btnCancelReply: document.getElementById('btn-cancel-reply'),
     
-    // Chat Input Toolbar
+    // Input Toolbar
     chatForm: document.getElementById('chat-form'),
     chatMessageInput: document.getElementById('chat-message-input'),
     voiceRecordBtn: document.getElementById('voice-record-btn'),
@@ -432,6 +440,7 @@
     btnPttGiant: document.getElementById('btn-ptt-giant'),
     pttBtnLabel: document.getElementById('ptt-btn-label'),
     pttRingPulse: document.getElementById('ptt-ring-pulse'),
+    btnToggleMicLock: document.getElementById('btn-toggle-mic-lock'),
     pttLogList: document.getElementById('ptt-log-list'),
 
     // Sketch Modal
@@ -472,17 +481,25 @@
     btnCallEnd: document.getElementById('btn-call-end')
   };
 
-  // --- 6. Navigation View Switching & Theme ---
+  // --- 6. View Switching & Appearance ---
   function switchView(viewName) {
     state.activeView = viewName;
-    elements.tabBtnChat.classList.toggle('active', viewName === 'chat');
-    elements.tabBtnMap.classList.toggle('active', viewName === 'map');
-    elements.tabBtnPtt.classList.toggle('active', viewName === 'ptt');
+    
+    // Desktop Nav
+    if (elements.tabBtnChat) elements.tabBtnChat.classList.toggle('active', viewName === 'chat');
+    if (elements.tabBtnMap) elements.tabBtnMap.classList.toggle('active', viewName === 'map');
+    if (elements.tabBtnPtt) elements.tabBtnPtt.classList.toggle('active', viewName === 'ptt');
+
+    // Mobile Bottom Nav
+    if (elements.mobTabChat) elements.mobTabChat.classList.toggle('active', viewName === 'chat');
+    if (elements.mobTabMap) elements.mobTabMap.classList.toggle('active', viewName === 'map');
+    if (elements.mobTabPtt) elements.mobTabPtt.classList.toggle('active', viewName === 'ptt');
 
     elements.viewPaneChat.style.display = viewName === 'chat' ? 'flex' : 'none';
     elements.viewPaneMap.style.display = viewName === 'map' ? 'flex' : 'none';
     elements.viewPanePtt.style.display = viewName === 'ptt' ? 'flex' : 'none';
 
+    closeSidebarDrawer();
     if (viewName === 'map') resizeAndDrawMap();
   }
 
@@ -493,7 +510,17 @@
     if (state.activeView === 'map') resizeAndDrawMap();
   }
 
-  // --- 7. Battery Telemetry Monitor ---
+  function openSidebarDrawer() {
+    elements.sidebar.classList.add('open');
+    elements.sidebarBackdrop.classList.add('active');
+  }
+
+  function closeSidebarDrawer() {
+    elements.sidebar.classList.remove('open');
+    elements.sidebarBackdrop.classList.remove('active');
+  }
+
+  // --- 7. Apple-Style Battery Telemetry Widget ---
   async function initBatteryMonitor() {
     if ('getBattery' in navigator) {
       try {
@@ -501,8 +528,12 @@
         const updateBattery = () => {
           const level = Math.round(battery.level * 100);
           state.batteryPercent = level;
-          elements.selfBatteryPill.textContent = `${battery.charging ? '⚡' : '🔋'} ${level}%`;
-          elements.selfBatteryPill.classList.toggle('low', level <= 20);
+
+          if (elements.selfBatFill) elements.selfBatFill.style.width = `${level}%`;
+          if (elements.selfBatText) elements.selfBatText.textContent = `${level}%`;
+          if (elements.selfBatteryPill) {
+            elements.selfBatteryPill.classList.toggle('low', level <= 20);
+          }
 
           if (state.ws && state.ws.readyState === WebSocket.OPEN) {
             state.ws.send(JSON.stringify({
@@ -527,18 +558,15 @@
     elements.sosModalOverlay.classList.add('active');
     startSosAudio();
 
-    // Visual Screen Strobe
     let flash = false;
     state.sos.strobeTimer = setInterval(() => {
       flash = !flash;
       elements.sosModalOverlay.classList.toggle('strobe-flash', flash);
     }, 220);
 
-    // Camera Flashlight Torch Strobe
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       const track = stream.getVideoTracks()[0];
-      const imageCapture = new ImageCapture(track);
       const capabilities = await track.getCapabilities();
       if (capabilities.torch) {
         state.sos.torchTrack = track;
@@ -548,7 +576,6 @@
       console.warn('[SOS] Torch not accessible:', e);
     }
 
-    // Acquire precise GPS
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((pos) => {
         state.myCoords = {
@@ -609,12 +636,12 @@
     {
       cat: 'firstaid',
       title: 'Fractures & Sprains Immobilization',
-      body: 'Do not attempt to push bone back in. Splint the joint above and below the fracture using straight branches/trekking poles padded with clothing. Wrap firmly with bandage/tape, ensuring blood circulation is not cut off.'
+      body: 'Do not attempt to push bone back in. Splint the joint above and below the fracture using straight branches padded with clothing. Wrap firmly with tape, ensuring blood circulation is not cut off.'
     },
     {
       cat: 'firstaid',
       title: 'Snake & Venomous Insect Bites',
-      body: 'Keep the victim calm and still. Keep the bitten limb below heart level. Wash bite area gently. DO NOT cut, suck venom, apply ice, or use a tourniquet. Mark the swelling border with a pen and time it.'
+      body: 'Keep victim calm and still. Keep bitten limb below heart level. Wash area gently. DO NOT cut, suck venom, apply ice, or use a tourniquet. Mark swelling border with a pen and note the time.'
     },
     {
       cat: 'firstaid',
@@ -624,22 +651,22 @@
     {
       cat: 'firstaid',
       title: 'Heat Exhaustion vs Heat Stroke',
-      body: 'Heat Stroke is life-threatening (hot dry skin, confusion, no sweat). Immediately move to shade, douse with water, and fan aggressively. Apply wet cold cloths to neck, armpits, and groin.'
+      body: 'Heat Stroke is life-threatening (hot dry skin, confusion, no sweat). Immediately move to shade, douse with water, and fan aggressively. Apply wet cold cloths to neck and armpits.'
     },
     {
       cat: 'water',
       title: 'Wilderness Water Purification',
-      body: '1. Rolling Boil: Boil water vigorously for at least 1 full minute (3 mins at high altitude).\n2. Solar Disinfection (SODIS): Clear PET plastic bottle in direct sunlight for 6 hours.\n3. DIY Sand/Charcoal Filter: Layer cloth, crushed charcoal, fine sand, and gravel.'
+      body: '1. Rolling Boil: Boil vigorously for at least 1 full minute (3 mins at altitude).\n2. Solar Disinfection (SODIS): Clear PET bottle in direct sunlight for 6 hours.\n3. DIY Sand/Charcoal Filter: Layer cloth, crushed charcoal, fine sand, and gravel.'
     },
     {
       cat: 'shelter',
       title: 'Debris Hut & Bivouac Shelter',
-      body: 'Prop a 2.5m ridgepole branch against a sturdy tree fork. Lean ribs along both sides at a 45-degree angle. Pile 2-3 feet of dry leaves/pine needles on top for waterproof insulation.'
+      body: 'Prop a 2.5m ridgepole branch against a sturdy tree fork. Lean ribs along both sides at 45°. Pile 2-3 feet of dry leaves/pine needles on top for waterproof thermal insulation.'
     },
     {
       cat: 'signals',
       title: 'Ground-to-Air Emergency Signals',
-      body: 'Make large symbols on ground with stones, logs, or stomped snow (minimum 3m long):\n• "V" = Require Assistance\n• "X" = Require Medical Assistance\n• "SOS" = International Distress Signal\n• 3 fires in a triangle = Universal Distress.'
+      body: 'Make large symbols on ground with stones, logs, or stomped snow (min 3m long):\n• "V" = Require Assistance\n• "X" = Require Medical Assistance\n• "SOS" = International Distress Signal\n• 3 fires in a triangle = Universal Distress.'
     },
     {
       cat: 'morse',
@@ -676,7 +703,7 @@
     });
   }
 
-  // --- 10. Safety Roll Call Check-In Engine ---
+  // --- 10. Safety Roll Call Check-In Engine (De-duplicated) ---
   function startRollCall() {
     elements.rollcallModalOverlay.classList.add('active');
     elements.rollcallPromptSubtitle.textContent = 'You started a safety roll call';
@@ -705,7 +732,6 @@
         coords: state.myCoords
       }));
     } else {
-      // Local fallback only if offline/disconnected
       handleIncomingRollCallResponse({
         senderId: state.self.id,
         senderName: state.self.name,
@@ -749,7 +775,7 @@
 
     state.ws.onopen = () => {
       state.connected = true;
-      updateConnectionStatus(true, 'Connected to local mesh');
+      updateConnectionStatus(true, 'Connected');
       
       state.ws.send(JSON.stringify({
         type: 'JOIN',
@@ -768,7 +794,7 @@
 
     state.ws.onclose = () => {
       state.connected = false;
-      updateConnectionStatus(false, 'Waiting for local mesh...');
+      updateConnectionStatus(false, 'Waiting for mesh...');
       setTimeout(connectWebSocket, 3000);
     };
 
@@ -870,7 +896,6 @@
         }
         break;
 
-      // WebRTC Calling Events
       case 'CALL_INVITE':
         handleIncomingCallInvite(data);
         break;
@@ -895,13 +920,14 @@
     }
   }
 
-  // --- 12. Walkie-Talkie Push-to-Talk (PTT) Engine ---
+  // --- 12. Walkie-Talkie Push-to-Talk (PTT) Touch & Mobile Optimized ---
   let pttSelectedIcon = '⛺';
 
   async function startPttTransmission() {
     if (state.ptt.isTransmitting) return;
 
     try {
+      if ('vibrate' in navigator) navigator.vibrate(40);
       playSound('radio_start');
       state.ptt.isTransmitting = true;
       elements.btnPttGiant.classList.add('transmitting');
@@ -926,6 +952,7 @@
   function stopPttTransmission() {
     if (!state.ptt.isTransmitting || !state.ptt.recorder) return;
 
+    if ('vibrate' in navigator) navigator.vibrate(25);
     playSound('radio_end');
     state.ptt.isTransmitting = false;
     elements.btnPttGiant.classList.remove('transmitting');
@@ -954,6 +981,19 @@
     state.ptt.recorder.stop();
   }
 
+  function toggleMicLock() {
+    state.ptt.isLocked = !state.ptt.isLocked;
+    elements.btnToggleMicLock.classList.toggle('locked', state.ptt.isLocked);
+
+    if (state.ptt.isLocked) {
+      elements.btnToggleMicLock.querySelector('span').textContent = '🔴 Mic Locked (Tap to Stop)';
+      startPttTransmission();
+    } else {
+      elements.btnToggleMicLock.querySelector('span').textContent = '🔒 Tap to Lock Mic (Hands-Free)';
+      stopPttTransmission();
+    }
+  }
+
   function handleIncomingPttAudio(data) {
     playSound('radio_start');
     const audio = new Audio(data.audioData);
@@ -978,7 +1018,7 @@
     elements.pttLogList.prepend(item);
   }
 
-  // --- 13. Offline GPS Map & Breadcrumb Tracker Canvas Engine ---
+  // --- 13. Offline GPS Map Canvas Engine ---
   let mapCanvasCtx = null;
 
   function initMapEngine() {
@@ -1021,7 +1061,7 @@
         if (state.activeView === 'map') drawMap();
       },
       (err) => {
-        elements.mapGpsStatus.textContent = 'GPS Searching...';
+        elements.mapGpsStatus.textContent = 'Searching...';
         elements.mapGpsStatus.classList.remove('active');
       },
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
@@ -1091,7 +1131,6 @@
     const toCanvasX = (lon) => centerX + (lon - refLon) * scale;
     const toCanvasY = (lat) => centerY - (lat - refLat) * scale;
 
-    // Draw GPS Breadcrumbs
     if (state.myTrail.length > 1) {
       mapCanvasCtx.beginPath();
       mapCanvasCtx.strokeStyle = '#34c759';
@@ -1108,7 +1147,6 @@
       mapCanvasCtx.setLineDash([]);
     }
 
-    // Draw Custom Waypoints
     state.waypoints.forEach(wp => {
       const cx = toCanvasX(wp.lon);
       const cy = toCanvasY(wp.lat);
@@ -1121,7 +1159,6 @@
       mapCanvasCtx.fillText(wp.name, cx - 18, cy + 22);
     });
 
-    // Draw Remote Peers
     state.peerLocations.forEach((peer, peerId) => {
       if (peerId === state.self.id || !peer.coords) return;
       const px = toCanvasX(peer.coords.longitude);
@@ -1145,7 +1182,6 @@
       mapCanvasCtx.fillText(peer.name || 'Peer', px + 10, py + 4);
     });
 
-    // Draw Self Position
     mapCanvasCtx.beginPath();
     mapCanvasCtx.arc(centerX, centerY, 8, 0, Math.PI * 2);
     mapCanvasCtx.fillStyle = '#007aff';
@@ -1157,34 +1193,6 @@
     mapCanvasCtx.font = 'bold 12px -apple-system, sans-serif';
     mapCanvasCtx.fillStyle = '#ffffff';
     mapCanvasCtx.fillText(`You (${state.self.name})`, centerX + 12, centerY + 4);
-
-    drawCompassRose(w - 40, 40);
-  }
-
-  function drawCompassRose(x, y) {
-    mapCanvasCtx.save();
-    mapCanvasCtx.translate(x, y);
-
-    mapCanvasCtx.beginPath();
-    mapCanvasCtx.arc(0, 0, 20, 0, Math.PI * 2);
-    mapCanvasCtx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-    mapCanvasCtx.fill();
-    mapCanvasCtx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-    mapCanvasCtx.stroke();
-
-    mapCanvasCtx.beginPath();
-    mapCanvasCtx.moveTo(0, -14);
-    mapCanvasCtx.lineTo(5, 0);
-    mapCanvasCtx.lineTo(-5, 0);
-    mapCanvasCtx.closePath();
-    mapCanvasCtx.fillStyle = '#ff3b30';
-    mapCanvasCtx.fill();
-
-    mapCanvasCtx.font = 'bold 9px sans-serif';
-    mapCanvasCtx.fillStyle = '#ffffff';
-    mapCanvasCtx.fillText('N', -3, -16);
-
-    mapCanvasCtx.restore();
   }
 
   function openWaypointModal() {
@@ -1224,7 +1232,7 @@
     if (state.activeView === 'map') drawMap();
   }
 
-  // --- 14. Peer List Rendering & Battery Badges ---
+  // --- 14. Peer List Rendering & Sleek Battery Badges ---
   function getInitials(name) {
     if (!name) return 'U';
     const parts = name.trim().split(/\s+/);
@@ -1245,7 +1253,7 @@
       if (peer.id === state.self.id) return;
 
       const bat = state.peerBatteries.get(peer.id);
-      const batHtml = bat ? `<span class="battery-pill ${bat.level <= 20 ? 'low' : ''}">${bat.charging ? '⚡' : '🔋'} ${bat.level}%</span>` : '';
+      const batHtml = bat ? `<span class="peer-battery-badge ${bat.level <= 20 ? 'low' : ''}">🔋 ${bat.level}%</span>` : '';
 
       const div = document.createElement('div');
       div.className = `peer-item ${state.activeTargetId === peer.id ? 'active' : ''}`;
@@ -1298,10 +1306,10 @@
     }
 
     renderMessagesForActiveTarget();
-    elements.sidebar.classList.remove('open');
+    closeSidebarDrawer();
   }
 
-  // --- 15. GPS Distance & Bearing Calculation ---
+  // --- 15. Distance & Bearing Calculations ---
   function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371e3;
     const φ1 = lat1 * Math.PI / 180;
@@ -1622,7 +1630,7 @@
     );
   }
 
-  // --- 17. Freeform Sketch Canvas Pad ---
+  // --- 17. Freeform Sketch Canvas ---
   let canvasCtx = null;
 
   function initSketchCanvas() {
@@ -1720,7 +1728,7 @@
     await dispatchMessage(msg);
   }
 
-  // --- 18. Offline Transcript Exporter ---
+  // --- 18. Export Transcript ---
   async function exportChatTranscript() {
     const allMsgs = await loadStoredMessages();
     if (allMsgs.length === 0) {
@@ -1770,7 +1778,7 @@
     }
   }
 
-  // --- 20. Audio Voice Note Recorder ---
+  // --- 20. Voice Note Recording ---
   async function toggleVoiceRecording() {
     if (!state.isRecording) {
       try {
@@ -1805,7 +1813,6 @@
         state.mediaRecorder.start();
         state.isRecording = true;
         elements.voiceRecordBtn.classList.add('recording');
-        elements.voiceRecordBtn.title = 'Tap to Send Voice Memo';
       } catch (err) {
         alert('Microphone access is required.');
       }
@@ -1813,7 +1820,6 @@
       state.mediaRecorder.stop();
       state.isRecording = false;
       elements.voiceRecordBtn.classList.remove('recording');
-      elements.voiceRecordBtn.title = 'Record offline voice memo';
     }
   }
 
@@ -1889,7 +1895,7 @@
     elements.chatMessageInput.value = '';
   }
 
-  // --- 22. Offline WebRTC Audio & Video Calling Engine ---
+  // --- 22. WebRTC Audio & Video Calling Engine (STUN Supported) ---
   async function initiateCall(isVideo) {
     if (state.activeTargetId === 'broadcast') {
       alert('Please select a specific peer from the sidebar to start a call.');
@@ -1917,7 +1923,7 @@
 
       elements.callActiveName.textContent = targetPeer.name;
       elements.callActiveAvatar.textContent = getInitials(targetPeer.name);
-      elements.callStatusLabel.textContent = isVideo ? 'Calling Video on local mesh...' : 'Calling Audio on local mesh...';
+      elements.callStatusLabel.textContent = isVideo ? 'Calling Video on mesh...' : 'Calling Audio on mesh...';
       elements.callTimer.textContent = 'Ringing...';
 
       if (isVideo) {
@@ -1963,7 +1969,7 @@
 
     elements.incomingCallerName.textContent = data.senderName || 'Nearby Hiker';
     elements.incomingCallAvatar.textContent = getInitials(data.senderName);
-    elements.incomingCallType.textContent = data.isVideo ? 'Incoming Offline Video Call' : 'Incoming Offline Audio Call';
+    elements.incomingCallType.textContent = data.isVideo ? 'Incoming Video Call' : 'Incoming Audio Call';
     elements.incomingCallOverlay.classList.add('active');
 
     startRingtone();
@@ -1984,7 +1990,7 @@
 
       elements.callActiveName.textContent = state.call.targetPeerName;
       elements.callActiveAvatar.textContent = getInitials(state.call.targetPeerName);
-      elements.callStatusLabel.textContent = 'Connecting local P2P stream...';
+      elements.callStatusLabel.textContent = 'Connecting P2P stream...';
 
       if (state.call.isVideo) {
         elements.callVideoContainer.classList.add('active');
@@ -2025,7 +2031,7 @@
   async function handleCallAccepted(data) {
     stopRingtone();
     state.call.status = 'connected';
-    elements.callStatusLabel.textContent = 'Direct P2P Link Established';
+    elements.callStatusLabel.textContent = 'P2P Link Established';
 
     createPeerConnection();
 
@@ -2061,14 +2067,14 @@
       sdp: answer
     }));
 
-    elements.callStatusLabel.textContent = 'Direct P2P Link Active';
+    elements.callStatusLabel.textContent = 'P2P Stream Active';
     startCallTimer();
   }
 
   async function handleCallAnswer(data) {
     if (state.call.pc) {
       await state.call.pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
-      elements.callStatusLabel.textContent = 'Direct P2P Link Active';
+      elements.callStatusLabel.textContent = 'P2P Stream Active';
     }
   }
 
@@ -2255,7 +2261,6 @@
     elements.qrModalOverlay.classList.remove('active');
   }
 
-  // --- 24. Helpers & Search Handlers ---
   function scrollToBottom() {
     elements.messagesContainer.scrollTop = elements.messagesContainer.scrollHeight;
   }
@@ -2291,14 +2296,24 @@
     renderMessagesForActiveTarget();
   }
 
-  // --- 25. Event Listeners Initialization ---
+  // --- 24. Event Listeners & Mobile PTT Touch Handlers ---
   function initEventListeners() {
-    // Navigation
-    elements.tabBtnChat.addEventListener('click', () => switchView('chat'));
-    elements.tabBtnMap.addEventListener('click', () => switchView('map'));
-    elements.tabBtnPtt.addEventListener('click', () => switchView('ptt'));
+    // Desktop View Tabs
+    if (elements.tabBtnChat) elements.tabBtnChat.addEventListener('click', () => switchView('chat'));
+    if (elements.tabBtnMap) elements.tabBtnMap.addEventListener('click', () => switchView('map'));
+    if (elements.tabBtnPtt) elements.tabBtnPtt.addEventListener('click', () => switchView('ptt'));
 
-    // Dark Mode Toggle
+    // Mobile Bottom Tabs
+    if (elements.mobTabChat) elements.mobTabChat.addEventListener('click', () => switchView('chat'));
+    if (elements.mobTabMap) elements.mobTabMap.addEventListener('click', () => switchView('map'));
+    if (elements.mobTabPtt) elements.mobTabPtt.addEventListener('click', () => switchView('ptt'));
+    if (elements.mobTabMenu) elements.mobTabMenu.addEventListener('click', openSidebarDrawer);
+
+    // Sidebar Backdrop & Drawer Controls
+    if (elements.sidebarBackdrop) elements.sidebarBackdrop.addEventListener('click', closeSidebarDrawer);
+    if (elements.btnCloseSidebar) elements.btnCloseSidebar.addEventListener('click', closeSidebarDrawer);
+
+    // Appearance Toggle
     elements.btnToggleTheme.addEventListener('click', toggleAppearance);
 
     // SOS Beacon
@@ -2329,7 +2344,7 @@
     elements.btnRollcallOk.addEventListener('click', () => submitRollCallResponse('ok'));
     elements.btnRollcallHelp.addEventListener('click', () => submitRollCallResponse('help'));
 
-    // Chat Form
+    // Chat Form & Attachments
     elements.chatForm.addEventListener('submit', handleSendMessage);
     elements.voiceRecordBtn.addEventListener('click', toggleVoiceRecording);
     elements.attachFileBtn.addEventListener('click', () => elements.fileInput.click());
@@ -2341,10 +2356,10 @@
     elements.btnClearSketch.addEventListener('click', clearSketchCanvas);
     elements.btnSendSketch.addEventListener('click', sendSketch);
 
-    // Location Share
+    // Location Sharing
     elements.btnShareLocation.addEventListener('click', shareLocation);
 
-    // Waypoints & Map
+    // Map Controls & Waypoints
     elements.btnDropWaypoint.addEventListener('click', openWaypointModal);
     elements.waypointModalCloseBtn.addEventListener('click', closeWaypointModal);
     elements.btnConfirmWaypoint.addEventListener('click', saveWaypoint);
@@ -2358,18 +2373,42 @@
       });
     });
 
-    // PTT
-    elements.btnPttGiant.addEventListener('pointerdown', (e) => {
+    // Walkie-Talkie Mobile Touch & Mouse Handlers (Suppress Long-Press Context Menu)
+    const pttBtn = elements.btnPttGiant;
+    
+    // Prevent iOS / Android long-press selection & context menu
+    pttBtn.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    // Touch Event Listeners for Mobile
+    pttBtn.addEventListener('touchstart', (e) => {
       e.preventDefault();
-      startPttTransmission();
+      if (!state.ptt.isLocked) startPttTransmission();
+    }, { passive: false });
+
+    pttBtn.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      if (!state.ptt.isLocked) stopPttTransmission();
+    }, { passive: false });
+
+    pttBtn.addEventListener('touchcancel', (e) => {
+      e.preventDefault();
+      if (!state.ptt.isLocked) stopPttTransmission();
+    }, { passive: false });
+
+    // Desktop Mouse / Pointer Listeners
+    pttBtn.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      if (!state.ptt.isLocked) startPttTransmission();
     });
 
-    window.addEventListener('pointerup', () => {
-      if (state.ptt.isTransmitting) stopPttTransmission();
+    window.addEventListener('mouseup', () => {
+      if (!state.ptt.isLocked && state.ptt.isTransmitting) stopPttTransmission();
     });
-    window.addEventListener('pointercancel', () => {
-      if (state.ptt.isTransmitting) stopPttTransmission();
-    });
+
+    // Hands-Free Mic Lock Button
+    if (elements.btnToggleMicLock) {
+      elements.btnToggleMicLock.addEventListener('click', toggleMicLock);
+    }
 
     // Encryption Settings
     elements.btnOpenEncryption.addEventListener('click', openEncryptionModal);
@@ -2420,9 +2459,7 @@
       if (e.target === elements.qrModalOverlay) closeQRModal();
     });
 
-    elements.menuToggleBtn.addEventListener('click', () => {
-      elements.sidebar.classList.toggle('open');
-    });
+    elements.menuToggleBtn.addEventListener('click', openSidebarDrawer);
 
     let typingTimeout = null;
     elements.chatMessageInput.addEventListener('input', () => {
@@ -2441,7 +2478,7 @@
     });
   }
 
-  // --- 26. Bootstrap ---
+  // --- 25. Bootstrap ---
   async function init() {
     elements.profileNameInput.value = state.self.name;
     elements.selfIdTag.textContent = `ID: ${state.self.id}`;

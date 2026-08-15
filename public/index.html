@@ -2,8 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#f5f5f7">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="description" content="Zero-Internet Offline Messaging, Calling, GPS Map, Walkie-Talkie & Survival Suite">
   <link rel="manifest" href="./manifest.json">
   <link rel="stylesheet" href="./styles.css">
@@ -15,7 +17,7 @@
   <header class="app-header" id="app-header">
     <div class="brand-section">
       <button class="btn-icon menu-toggle-btn" id="menu-toggle-btn" aria-label="Toggle Peers Menu">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
       
       <div class="brand-glyph" id="brand-logo">
@@ -30,18 +32,18 @@
       <div class="brand-info">
         <div class="brand-title-row">
           <h1>MeshChat</h1>
-          <span class="mode-badge" id="network-mode-badge">Offline Local</span>
+          <span class="mode-badge" id="network-mode-badge">Local Mesh</span>
           <span class="e2ee-badge" id="e2ee-status-badge" title="End-to-End Encrypted (AES-256)">🔒 E2EE</span>
         </div>
         <div class="brand-status">
           <span class="status-dot" id="connection-status-dot"></span>
-          <span id="connection-status-text">Connected to local mesh</span>
+          <span id="connection-status-text">Connected</span>
         </div>
       </div>
     </div>
 
-    <!-- Center Navigation Segmented Switcher -->
-    <div class="header-nav-segmented">
+    <!-- Center Navigation Segmented Switcher (Desktop & Tablets) -->
+    <div class="header-nav-segmented desktop-nav">
       <button class="nav-segment-btn active" data-view="chat" id="tab-btn-chat">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         <span>Chat</span>
@@ -59,7 +61,7 @@
     <!-- Header Actions -->
     <div class="header-actions">
       <!-- SOS Emergency Beacon Button -->
-      <button class="btn-icon btn-sos-trigger" id="btn-sos-beacon" title="Emergency SOS Beacon & Siren" aria-label="Emergency SOS">
+      <button class="btn-icon btn-sos-trigger" id="btn-sos-beacon" title="Emergency SOS Beacon" aria-label="Emergency SOS">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/>
           <line x1="12" y1="8" x2="12" y2="12"/>
@@ -68,19 +70,10 @@
       </button>
 
       <!-- Survival & First-Aid Guide -->
-      <button class="btn-icon" id="btn-open-guide" title="Offline Survival & First Aid Guide" aria-label="Survival Handbook">
+      <button class="btn-icon" id="btn-open-guide" title="Survival Guide" aria-label="Survival Handbook">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
           <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-        </svg>
-      </button>
-
-      <!-- Safety Roll Call Action -->
-      <button class="btn-icon" id="btn-start-rollcall" title="Initiate Team Safety Check-In" aria-label="Team Roll Call">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-          <circle cx="8.5" cy="7" r="4"/>
-          <polyline points="17 11 19 13 23 9"/>
         </svg>
       </button>
 
@@ -99,16 +92,8 @@
         </svg>
       </button>
 
-      <!-- Security / Encryption Settings Button -->
-      <button class="btn-icon" id="btn-open-encryption" title="Encryption Settings" aria-label="Security Settings">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-        </svg>
-      </button>
-
       <!-- Hotspot QR Modal Button -->
-      <button class="btn btn-primary" id="qr-share-btn" title="Show QR code for other phones to join">
+      <button class="btn btn-primary" id="qr-share-btn" title="Connect Peers">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="3" width="7" height="7" rx="1.5"/>
           <rect x="14" y="3" width="7" height="7" rx="1.5"/>
@@ -120,12 +105,33 @@
     </div>
   </header>
 
+  <!-- Mobile Sidebar Backdrop Overlay -->
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
   <!-- Main Application Body -->
   <main class="app-body" id="app-body">
     
-    <!-- Left Sidebar: Connected Peers & Search -->
+    <!-- Left Sidebar Drawer: Connected Peers & Search -->
     <aside class="sidebar" id="sidebar">
       
+      <!-- Drawer Header on Mobile -->
+      <div class="sidebar-drawer-top">
+        <span class="sidebar-title">Menu & Nearby Peers</span>
+        <button class="close-btn" id="btn-close-sidebar" aria-label="Close sidebar">&times;</button>
+      </div>
+
+      <!-- Quick Action Utilities in Drawer -->
+      <div class="sidebar-quick-actions">
+        <button class="quick-act-btn" id="btn-start-rollcall" title="Team Roll Call">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>
+          <span>Safety Check-In</span>
+        </button>
+        <button class="quick-act-btn" id="btn-open-encryption" title="Encryption Key">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <span>Passphrase</span>
+        </button>
+      </div>
+
       <!-- Search Input Container -->
       <div class="sidebar-search-box">
         <div class="search-input-wrapper">
@@ -133,13 +139,13 @@
             <circle cx="11" cy="11" r="8"/>
             <line x1="21" y1="21" x2="16.65" y2="16.65"/>
           </svg>
-          <input type="text" id="search-input" placeholder="Search offline messages..." autocomplete="off">
+          <input type="text" id="search-input" placeholder="Search messages..." autocomplete="off">
           <button type="button" class="btn-clear-search" id="btn-clear-search" style="display: none;">&times;</button>
         </div>
       </div>
 
       <div class="sidebar-header">
-        <span class="sidebar-title">Channels & Peers</span>
+        <span class="sidebar-title">Connected Devices</span>
         <span class="peer-count-badge" id="peer-count-badge">0 Online</span>
       </div>
 
@@ -161,7 +167,7 @@
         </div>
       </div>
 
-      <!-- Current User Profile Strip with Battery -->
+      <!-- Current User Profile Strip with Sleek Apple Battery Widget -->
       <div class="user-profile-strip" id="user-profile-strip">
         <div class="profile-info">
           <div class="peer-avatar user" id="self-avatar">
@@ -171,9 +177,15 @@
             </svg>
           </div>
           <div class="profile-text-wrap">
-            <div style="display: flex; align-items: center; gap: 6px;">
+            <div class="profile-top-line">
               <input type="text" class="profile-name-input" id="profile-name-input" value="User_1" placeholder="Your Name" title="Edit your display name">
-              <span class="battery-pill" id="self-battery-pill" title="Battery Status">⚡ 100%</span>
+              <!-- Sleek Horizontal Apple Battery Widget -->
+              <div class="battery-capsule-widget" id="self-battery-pill" title="Battery Status">
+                <span class="bat-icon-box">
+                  <span class="bat-level-fill" id="self-bat-fill" style="width: 100%;"></span>
+                </span>
+                <span class="bat-percent-label" id="self-bat-text">100%</span>
+              </div>
             </div>
             <div class="peer-sub" id="self-id-tag">ID: local-peer</div>
           </div>
@@ -230,7 +242,7 @@
           </div>
           <div class="notice-body">
             <strong>Zero-Internet Local Network Active</strong>
-            <p>Messages, voice memos, sketches, and calls stay strictly within your local Wi-Fi / Hotspot. Fully encrypted with AES-256 on-device.</p>
+            <p>Messages, voice memos, sketches, and calls stay strictly within your local network. Fully encrypted with AES-256 on-device.</p>
           </div>
         </div>
       </div>
@@ -249,13 +261,13 @@
         <form class="input-form" id="chat-form">
           <input type="file" id="file-input" style="display: none;" accept="image/*,audio/*,application/pdf,text/*">
           
-          <button type="button" class="btn-tool" id="attach-file-btn" title="Share photo or file offline" aria-label="Attach File">
+          <button type="button" class="btn-tool" id="attach-file-btn" title="Share photo or file" aria-label="Attach File">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
             </svg>
           </button>
 
-          <button type="button" class="btn-tool" id="btn-open-sketch" title="Draw map / sketch offline" aria-label="Draw Sketch">
+          <button type="button" class="btn-tool" id="btn-open-sketch" title="Draw map / sketch" aria-label="Draw Sketch">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 19l7-7 3 3-7 7-3-3z"/>
               <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
@@ -264,14 +276,14 @@
             </svg>
           </button>
 
-          <button type="button" class="btn-tool" id="btn-share-location" title="Share GPS location & distance offline" aria-label="Share Location">
+          <button type="button" class="btn-tool" id="btn-share-location" title="Share GPS location" aria-label="Share Location">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
               <circle cx="12" cy="10" r="3"/>
             </svg>
           </button>
 
-          <button type="button" class="btn-tool" id="voice-record-btn" title="Record offline voice memo" aria-label="Record Voice Memo">
+          <button type="button" class="btn-tool" id="voice-record-btn" title="Record voice memo" aria-label="Record Voice Memo">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
               <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
@@ -300,15 +312,15 @@
           <span class="stat-value active" id="map-gps-status">Active (3D Fix)</span>
         </div>
         <div class="map-stat-item">
-          <span class="stat-label">BREADCRUMBS:</span>
-          <span class="stat-value" id="map-trail-points">0 Recorded</span>
+          <span class="stat-label">TRAIL:</span>
+          <span class="stat-value" id="map-trail-points">0 Points</span>
         </div>
         <div class="map-stat-item">
-          <span class="stat-label">PEERS ON MAP:</span>
+          <span class="stat-label">PEERS:</span>
           <span class="stat-value" id="map-peer-count">0 Tracked</span>
         </div>
         <div class="map-actions-group">
-          <button class="btn btn-secondary" id="btn-drop-waypoint" style="padding: 4px 10px; font-size: 12px;">+ Drop Waypoint</button>
+          <button class="btn btn-secondary" id="btn-drop-waypoint" style="padding: 4px 10px; font-size: 12px;">+ Waypoint</button>
           <button class="btn btn-secondary" id="btn-recenter-map" style="padding: 4px 10px; font-size: 12px;">🎯 Recenter</button>
         </div>
       </div>
@@ -324,13 +336,14 @@
         <div class="ptt-header-card">
           <div class="ptt-channel-badge">📻 CH 01 • MESH BROADCAST</div>
           <h2>Walkie-Talkie Radio</h2>
-          <p>Hold button to transmit voice blast directly to all nearby devices</p>
+          <p>Hold button (or tap Lock Mic) to broadcast voice blast</p>
         </div>
 
         <div class="ptt-button-wrapper">
           <div class="ptt-ring-pulse" id="ptt-ring-pulse"></div>
-          <button class="btn-ptt-giant" id="btn-ptt-giant" aria-label="Push to Talk">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <!-- Tactile Mobile-Optimized PTT Button with touch-action: none -->
+          <button class="btn-ptt-giant" id="btn-ptt-giant" aria-label="Push to Talk" type="button">
+            <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
               <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
               <line x1="12" y1="19" x2="12" y2="23"/>
@@ -339,6 +352,11 @@
             <span class="ptt-btn-label" id="ptt-btn-label">HOLD TO TALK</span>
           </button>
         </div>
+
+        <!-- Hands-Free Toggle for Mobile -->
+        <button class="btn btn-secondary btn-lock-mic" id="btn-toggle-mic-lock" type="button">
+          <span>🔒 Tap to Lock Mic (Hands-Free)</span>
+        </button>
 
         <div class="ptt-activity-card">
           <h4>Recent Radio Transmissions</h4>
@@ -350,6 +368,26 @@
     </section>
 
   </main>
+
+  <!-- Dedicated Native iOS/Android Bottom Navigation Bar on Mobile -->
+  <nav class="mobile-bottom-bar" id="mobile-bottom-nav">
+    <button class="mob-nav-tab active" data-view="chat" id="mob-tab-chat">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <span>Chat</span>
+    </button>
+    <button class="mob-nav-tab" data-view="map" id="mob-tab-map">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+      <span>GPS Map</span>
+    </button>
+    <button class="mob-nav-tab" data-view="ptt" id="mob-tab-ptt">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+      <span>Walkie</span>
+    </button>
+    <button class="mob-nav-tab" id="mob-tab-menu">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      <span>Peers</span>
+    </button>
+  </nav>
 
   <!-- Emergency SOS Siren & Strobe Fullscreen Modal -->
   <div class="modal-overlay sos-fullscreen-overlay" id="sos-modal-overlay">
@@ -374,7 +412,7 @@
     <div class="modal-card guide-modal-card">
       <div class="modal-header">
         <div>
-          <h3 class="modal-title">📖 Offline Wilderness Survival Guide</h3>
+          <h3 class="modal-title">📖 Wilderness Survival Guide</h3>
           <p class="modal-subtitle">Field handbook & first-aid protocols (100% offline)</p>
         </div>
         <button class="close-btn" id="guide-modal-close-btn">&times;</button>
@@ -393,7 +431,6 @@
       </div>
 
       <div class="guide-content-area" id="guide-content-area">
-        <!-- Content dynamic injection -->
       </div>
     </div>
   </div>
@@ -428,8 +465,8 @@
     <div class="modal-card">
       <div class="modal-header">
         <div>
-          <h3 class="modal-title">Connect Nearby Devices</h3>
-          <p class="modal-subtitle">Share this offline network with friends nearby</p>
+          <h3 class="modal-title">Connect Devices</h3>
+          <p class="modal-subtitle">Share this network with friends nearby</p>
         </div>
         <button class="close-btn" id="qr-modal-close-btn" aria-label="Close modal">&times;</button>
       </div>
@@ -441,7 +478,7 @@
           </div>
         </div>
         <p class="qr-instructions">
-          Scan this QR code with any iPhone, Android, or laptop camera connected to this Wi-Fi hotspot.
+          Scan this QR code with any phone camera connected to this Wi-Fi hotspot.
         </p>
       </div>
 
@@ -515,8 +552,8 @@
     <div class="modal-card sketch-modal-card">
       <div class="modal-header">
         <div>
-          <h3 class="modal-title">🎨 Freeform Sketch & Trail Map</h3>
-          <p class="modal-subtitle">Draw routes, notes, or maps offline</p>
+          <h3 class="modal-title">🎨 Freeform Sketch</h3>
+          <p class="modal-subtitle">Draw routes, notes, or maps</p>
         </div>
         <button class="close-btn" id="sketch-modal-close-btn">&times;</button>
       </div>
@@ -551,7 +588,7 @@
       <div class="incoming-avatar" id="incoming-call-avatar">U</div>
       <div class="incoming-info">
         <h4 id="incoming-caller-name">User</h4>
-        <p id="incoming-call-type">Incoming Offline Call...</p>
+        <p id="incoming-call-type">Incoming Call...</p>
       </div>
       <div class="incoming-actions">
         <button class="btn-call-circle decline" id="btn-incoming-decline" title="Decline Call" aria-label="Decline">
