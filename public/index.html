@@ -58,23 +58,12 @@
       </button>
     </div>
 
-    <!-- Header Actions -->
+    <!-- Header Actions (Clean, Non-Redundant) -->
     <div class="header-actions">
-      <!-- 🧰 Mesh Apps & Tools Hub Trigger -->
+      <!-- 🧰 Central Mesh Apps & Tools Hub -->
       <button class="btn btn-secondary header-hub-btn" id="btn-open-tools-hub" title="Mesh Apps & Tools Hub">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
         <span>Apps & Tools</span>
-      </button>
-
-      <!-- 🤖 Offline AI Survival Assistant Button -->
-      <button class="btn-icon btn-ai-trigger" id="btn-open-ai" title="Offline AI Survival Assistant" aria-label="AI Assistant">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2 2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/>
-          <rect x="4" y="8" width="16" height="12" rx="3"/>
-          <circle cx="9" cy="13" r="1.5" fill="currentColor"/>
-          <circle cx="15" cy="13" r="1.5" fill="currentColor"/>
-          <path d="M9 17h6"/>
-        </svg>
       </button>
 
       <!-- SOS Emergency Beacon Button -->
@@ -83,14 +72,6 @@
           <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/>
           <line x1="12" y1="8" x2="12" y2="12"/>
           <line x1="12" y1="16" x2="12.01" y2="16"/>
-        </svg>
-      </button>
-
-      <!-- Survival & First-Aid Guide -->
-      <button class="btn-icon" id="btn-open-guide" title="Survival Guide" aria-label="Survival Handbook">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
         </svg>
       </button>
 
@@ -137,18 +118,6 @@
         <button class="close-btn" id="btn-close-sidebar" aria-label="Close sidebar">&times;</button>
       </div>
 
-      <!-- Clean Quick Action Utilities in Drawer -->
-      <div class="sidebar-quick-actions">
-        <button class="quick-act-btn main-hub-btn" id="btn-sidebar-tools-hub" title="Open Mesh Apps & Tools Hub">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-          <span>⚡ Apps & Tools Hub</span>
-        </button>
-        <button class="quick-act-btn" id="btn-start-rollcall" title="Team Safety Check-In">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>
-          <span>Safety Check</span>
-        </button>
-      </div>
-
       <!-- Search Input Container -->
       <div class="sidebar-search-box">
         <div class="search-input-wrapper">
@@ -156,13 +125,13 @@
             <circle cx="11" cy="11" r="8"/>
             <line x1="21" y1="21" x2="16.65" y2="16.65"/>
           </svg>
-          <input type="text" id="search-input" placeholder="Search messages..." autocomplete="off">
+          <input type="text" id="search-input" placeholder="Search messages, rooms..." autocomplete="off">
           <button type="button" class="btn-clear-search" id="btn-clear-search" style="display: none;">&times;</button>
         </div>
       </div>
 
       <!-- Channels Section -->
-      <div class="sidebar-header" style="margin-top: 4px;">
+      <div class="sidebar-header">
         <span class="sidebar-title">Topic Rooms</span>
         <button class="btn-add-channel-header" id="btn-create-channel" title="Create New Channel">+</button>
       </div>
@@ -247,13 +216,6 @@
         </div>
 
         <div class="chat-header-actions" id="chat-header-actions">
-          <button class="btn-call-action" id="btn-toggle-disappearing" title="Disappearing Messages Timer" aria-label="Disappearing Messages">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
-            <span class="timer-dot-badge" id="disappearing-badge" style="display: none;">30s</span>
-          </button>
-          <button class="btn-call-action" id="btn-open-wallpapers" title="Chat Wallpaper & Colors" aria-label="Theme Customizer">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
-          </button>
           <button class="btn-call-action" id="btn-audio-call" title="Start Audio Call" aria-label="Audio Call" style="display: none;">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
@@ -1334,33 +1296,45 @@
         <div class="hub-grid">
           <div class="hub-app-card" id="hub-card-notes">
             <div class="hub-icon">📋</div>
-            <div class="hub-name">Sync Notes</div>
-            <div class="hub-desc">Real-time shared checklist</div>
+            <div class="hub-info">
+              <div class="hub-name">Sync Notes</div>
+              <div class="hub-desc">Real-time shared checklist</div>
+            </div>
           </div>
           <div class="hub-app-card" id="hub-card-timer">
             <div class="hub-icon">⏱️</div>
-            <div class="hub-name">Group Timer</div>
-            <div class="hub-desc">Synchronized countdown</div>
+            <div class="hub-info">
+              <div class="hub-name">Group Timer</div>
+              <div class="hub-desc">Synchronized countdown</div>
+            </div>
           </div>
           <div class="hub-app-card" id="hub-card-expenses">
             <div class="hub-icon">💰</div>
-            <div class="hub-name">Split Bills</div>
-            <div class="hub-desc">Expense tally & split</div>
+            <div class="hub-info">
+              <div class="hub-name">Split Bills</div>
+              <div class="hub-desc">Expense tally & split</div>
+            </div>
           </div>
           <div class="hub-app-card" id="hub-card-events">
             <div class="hub-icon">🗓️</div>
-            <div class="hub-name">Events & RSVP</div>
-            <div class="hub-desc">Schedule meetups</div>
+            <div class="hub-info">
+              <div class="hub-name">Events & RSVP</div>
+              <div class="hub-desc">Schedule meetups</div>
+            </div>
           </div>
           <div class="hub-app-card" id="hub-card-starred">
             <div class="hub-icon">⭐</div>
-            <div class="hub-name">Starred Vault</div>
-            <div class="hub-desc">Saved bookmarks</div>
+            <div class="hub-info">
+              <div class="hub-name">Starred Vault</div>
+              <div class="hub-desc">Saved bookmarks</div>
+            </div>
           </div>
           <div class="hub-app-card" id="hub-card-games">
             <div class="hub-icon">🎮</div>
-            <div class="hub-name">Games Hub</div>
-            <div class="hub-desc">Tic-Tac-Toe & Dice</div>
+            <div class="hub-info">
+              <div class="hub-name">Games Hub</div>
+              <div class="hub-desc">Tic-Tac-Toe, Dice, RPS</div>
+            </div>
           </div>
         </div>
       </div>
@@ -1370,33 +1344,45 @@
         <div class="hub-grid">
           <div class="hub-app-card" id="hub-card-rollcall">
             <div class="hub-icon">🚨</div>
-            <div class="hub-name">Safety Check</div>
-            <div class="hub-desc">Team status roll call</div>
+            <div class="hub-info">
+              <div class="hub-name">Safety Check</div>
+              <div class="hub-desc">Team status roll call</div>
+            </div>
           </div>
           <div class="hub-app-card" id="hub-card-geofence">
             <div class="hub-icon">⭕</div>
-            <div class="hub-name">Geofence Alarm</div>
-            <div class="hub-desc">Perimeter breach alert</div>
+            <div class="hub-info">
+              <div class="hub-name">Geofence Alarm</div>
+              <div class="hub-desc">Perimeter breach alert</div>
+            </div>
           </div>
           <div class="hub-app-card" id="hub-card-morse">
             <div class="hub-icon">🔦</div>
-            <div class="hub-name">Morse Strobe</div>
-            <div class="hub-desc">Optical light signaling</div>
+            <div class="hub-info">
+              <div class="hub-name">Morse Strobe</div>
+              <div class="hub-desc">Optical light signaling</div>
+            </div>
           </div>
           <div class="hub-app-card" id="hub-card-radar">
             <div class="hub-icon">🎯</div>
-            <div class="hub-name">Tactical Radar</div>
-            <div class="hub-desc">360° team sonar HUD</div>
+            <div class="hub-info">
+              <div class="hub-name">Tactical Radar</div>
+              <div class="hub-desc">360° team sonar HUD</div>
+            </div>
           </div>
           <div class="hub-app-card" id="hub-card-ai">
             <div class="hub-icon">🤖</div>
-            <div class="hub-name">Survival AI</div>
-            <div class="hub-desc">100% offline assistant</div>
+            <div class="hub-info">
+              <div class="hub-name">Survival AI</div>
+              <div class="hub-desc">100% offline assistant</div>
+            </div>
           </div>
           <div class="hub-app-card" id="hub-card-guide">
             <div class="hub-icon">📖</div>
-            <div class="hub-name">Survival Guide</div>
-            <div class="hub-desc">Offline handbook</div>
+            <div class="hub-info">
+              <div class="hub-name">Survival Guide</div>
+              <div class="hub-desc">Offline handbook</div>
+            </div>
           </div>
         </div>
       </div>
@@ -1406,33 +1392,45 @@
         <div class="hub-grid">
           <div class="hub-app-card" id="hub-card-camera">
             <div class="hub-icon">📸</div>
-            <div class="hub-name">Snap Camera</div>
-            <div class="hub-desc">Live filters & photos</div>
+            <div class="hub-info">
+              <div class="hub-name">Snap Camera</div>
+              <div class="hub-desc">Live filters & photos</div>
+            </div>
           </div>
           <div class="hub-app-card" id="hub-card-network">
             <div class="hub-icon">📊</div>
-            <div class="hub-name">Network HUD</div>
-            <div class="hub-desc">Ping latency & topology</div>
+            <div class="hub-info">
+              <div class="hub-name">Network HUD</div>
+              <div class="hub-desc">Ping latency & topology</div>
+            </div>
           </div>
           <div class="hub-app-card" id="hub-card-red-mode">
             <div class="hub-icon">🔴</div>
-            <div class="hub-name">Red Night-Vision</div>
-            <div class="hub-desc">Preserve dark vision</div>
+            <div class="hub-info">
+              <div class="hub-name">Red Night-Vision</div>
+              <div class="hub-desc">Preserve dark vision</div>
+            </div>
           </div>
           <div class="hub-app-card" id="hub-card-encryption">
             <div class="hub-icon">🔒</div>
-            <div class="hub-name">Passphrase</div>
-            <div class="hub-desc">256-bit AES crypto</div>
+            <div class="hub-info">
+              <div class="hub-name">Passphrase</div>
+              <div class="hub-desc">256-bit AES crypto</div>
+            </div>
           </div>
           <div class="hub-app-card" id="hub-card-wallpaper">
             <div class="hub-icon">🎨</div>
-            <div class="hub-name">Wallpapers</div>
-            <div class="hub-desc">Themes & bubble accents</div>
+            <div class="hub-info">
+              <div class="hub-name">Wallpapers</div>
+              <div class="hub-desc">Themes & bubble accents</div>
+            </div>
           </div>
           <div class="hub-app-card" id="hub-card-disappearing">
             <div class="hub-icon">⏱️</div>
-            <div class="hub-name">Disappearing</div>
-            <div class="hub-desc">Self-destruct timer</div>
+            <div class="hub-info">
+              <div class="hub-name">Disappearing</div>
+              <div class="hub-desc">Self-destruct timer</div>
+            </div>
           </div>
         </div>
       </div>

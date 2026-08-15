@@ -4816,66 +4816,78 @@
     if (elements.btnCancelEdit) elements.btnCancelEdit.addEventListener('click', cancelEditing);
 
     // AI Survival Assistant
-    elements.btnOpenAi.addEventListener('click', () => elements.aiModalOverlay.classList.add('active'));
-    elements.aiModalCloseBtn.addEventListener('click', () => elements.aiModalOverlay.classList.remove('active'));
-    elements.aiInputForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      queryOfflineAiAssistant(elements.aiUserQuery.value);
-    });
+    if (elements.btnOpenAi) elements.btnOpenAi.addEventListener('click', () => elements.aiModalOverlay.classList.add('active'));
+    if (elements.aiModalCloseBtn) elements.aiModalCloseBtn.addEventListener('click', () => elements.aiModalOverlay.classList.remove('active'));
+    if (elements.aiInputForm) {
+      elements.aiInputForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        queryOfflineAiAssistant(elements.aiUserQuery.value);
+      });
+    }
 
     // Geofence Modal
-    elements.btnOpenGeofence.addEventListener('click', () => {
-      elements.geofenceSlider.value = state.geofence.radiusMeters;
-      elements.geofenceRadiusLabel.textContent = `${state.geofence.radiusMeters} meters`;
-      elements.geofenceActiveToggle.checked = state.geofence.enabled;
-      elements.geofenceModalOverlay.classList.add('active');
-    });
-    elements.geofenceModalCloseBtn.addEventListener('click', () => elements.geofenceModalOverlay.classList.remove('active'));
-    elements.geofenceSlider.addEventListener('input', (e) => {
-      elements.geofenceRadiusLabel.textContent = `${e.target.value} meters`;
-    });
-    elements.btnSaveGeofence.addEventListener('click', saveGeofenceSettings);
+    if (elements.btnOpenGeofence) {
+      elements.btnOpenGeofence.addEventListener('click', () => {
+        elements.geofenceSlider.value = state.geofence.radiusMeters;
+        elements.geofenceRadiusLabel.textContent = `${state.geofence.radiusMeters} meters`;
+        elements.geofenceActiveToggle.checked = state.geofence.enabled;
+        elements.geofenceModalOverlay.classList.add('active');
+      });
+    }
+    if (elements.geofenceModalCloseBtn) elements.geofenceModalCloseBtn.addEventListener('click', () => elements.geofenceModalOverlay.classList.remove('active'));
+    if (elements.geofenceSlider) {
+      elements.geofenceSlider.addEventListener('input', (e) => {
+        elements.geofenceRadiusLabel.textContent = `${e.target.value} meters`;
+      });
+    }
+    if (elements.btnSaveGeofence) elements.btnSaveGeofence.addEventListener('click', saveGeofenceSettings);
 
     // Morse Strobe Modal
-    elements.btnOpenMorse.addEventListener('click', () => elements.morseModalOverlay.classList.add('active'));
-    elements.morseModalCloseBtn.addEventListener('click', () => {
-      stopOpticalMorseFlasher();
-      elements.morseModalOverlay.classList.remove('active');
-    });
-    elements.btnStartMorse.addEventListener('click', startOpticalMorseFlasher);
-    elements.btnStopMorse.addEventListener('click', stopOpticalMorseFlasher);
+    if (elements.btnOpenMorse) elements.btnOpenMorse.addEventListener('click', () => elements.morseModalOverlay.classList.add('active'));
+    if (elements.morseModalCloseBtn) {
+      elements.morseModalCloseBtn.addEventListener('click', () => {
+        stopOpticalMorseFlasher();
+        elements.morseModalOverlay.classList.remove('active');
+      });
+    }
+    if (elements.btnStartMorse) elements.btnStartMorse.addEventListener('click', startOpticalMorseFlasher);
+    if (elements.btnStopMorse) elements.btnStopMorse.addEventListener('click', stopOpticalMorseFlasher);
 
     // Tactical Radar Modal
-    elements.btnOpenRadar.addEventListener('click', initTacticalRadar);
-    elements.radarModalCloseBtn.addEventListener('click', () => {
-      elements.radarModalOverlay.classList.remove('active');
-      if (state.radar.animFrame) cancelAnimationFrame(state.radar.animFrame);
-    });
+    if (elements.btnOpenRadar) elements.btnOpenRadar.addEventListener('click', initTacticalRadar);
+    if (elements.radarModalCloseBtn) {
+      elements.radarModalCloseBtn.addEventListener('click', () => {
+        elements.radarModalOverlay.classList.remove('active');
+        if (state.radar.animFrame) cancelAnimationFrame(state.radar.animFrame);
+      });
+    }
 
     // Elevation & Weather Panel
-    elements.btnToggleElevationPanel.addEventListener('click', () => {
-      const isVisible = elements.elevationPanel.style.display === 'block';
-      elements.elevationPanel.style.display = isVisible ? 'none' : 'block';
-      if (!isVisible) renderElevationProfile();
-    });
-    elements.btnCloseElev.addEventListener('click', () => elements.elevationPanel.style.display = 'none');
+    if (elements.btnToggleElevationPanel) {
+      elements.btnToggleElevationPanel.addEventListener('click', () => {
+        const isVisible = elements.elevationPanel.style.display === 'block';
+        elements.elevationPanel.style.display = isVisible ? 'none' : 'block';
+        if (!isVisible) renderElevationProfile();
+      });
+    }
+    if (elements.btnCloseElev) elements.btnCloseElev.addEventListener('click', () => elements.elevationPanel.style.display = 'none');
 
     // Appearance Toggle
-    elements.btnToggleTheme.addEventListener('click', toggleAppearance);
+    if (elements.btnToggleTheme) elements.btnToggleTheme.addEventListener('click', toggleAppearance);
 
     // SOS Beacon
-    elements.btnSosBeacon.addEventListener('click', activateSosBeacon);
-    elements.btnStopSos.addEventListener('click', deactivateSosBeacon);
+    if (elements.btnSosBeacon) elements.btnSosBeacon.addEventListener('click', activateSosBeacon);
+    if (elements.btnStopSos) elements.btnStopSos.addEventListener('click', deactivateSosBeacon);
 
     // Survival Guide
-    elements.btnOpenGuide.addEventListener('click', () => elements.guideModalOverlay.classList.add('active'));
-    elements.guideModalCloseBtn.addEventListener('click', () => elements.guideModalOverlay.classList.remove('active'));
+    if (elements.btnOpenGuide) elements.btnOpenGuide.addEventListener('click', () => elements.guideModalOverlay.classList.add('active'));
+    if (elements.guideModalCloseBtn) elements.guideModalCloseBtn.addEventListener('click', () => elements.guideModalOverlay.classList.remove('active'));
 
     // Roll Call
-    elements.btnStartRollcall.addEventListener('click', startRollCall);
-    elements.rollcallModalCloseBtn.addEventListener('click', () => elements.rollcallModalOverlay.classList.remove('active'));
-    elements.btnRollcallOk.addEventListener('click', () => submitRollCallResponse('ok'));
-    elements.btnRollcallHelp.addEventListener('click', () => submitRollCallResponse('help'));
+    if (elements.btnStartRollcall) elements.btnStartRollcall.addEventListener('click', startRollCall);
+    if (elements.rollcallModalCloseBtn) elements.rollcallModalCloseBtn.addEventListener('click', () => elements.rollcallModalOverlay.classList.remove('active'));
+    if (elements.btnRollcallOk) elements.btnRollcallOk.addEventListener('click', () => submitRollCallResponse('ok'));
+    if (elements.btnRollcallHelp) elements.btnRollcallHelp.addEventListener('click', () => submitRollCallResponse('help'));
 
     // Chat Form & Attachments
     elements.chatForm.addEventListener('submit', handleSendMessage);
