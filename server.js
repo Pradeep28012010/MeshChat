@@ -405,16 +405,25 @@ wss.on('connection', (ws, req) => {
   });
 });
 
-// Periodic heartbeat to clean up disconnected/idle mobile connections
-const heartbeatInterval = setInterval(() => {
-  wss.clients.forEach((ws) => {
-    if (ws.isAlive === false) return ws.terminate();
-    ws.isAlive = false;
-    ws.ping();
-  });
-}, 25000);
+// Clean up dead/closed sockets if inactive for > 90 seconds without dropping live proxy connections
+const safeCleanupInterval = setInterval(() => {
+  const now = Date.now();
+  for (const [peerId, peer] of connectedPeers.entries()) {
+    if (peer.ws.readyState !== WebSocket.OPEN || (now - (peer.info.lastSeen || 0) > 90000)) {
+      try { peer.ws.close(); } catch (e) {}
+      connectedPeers.delete(peerId);
+      broadcast({
+        type: 'PEER_LEFT',
+        peerId: peerId,
+        peerName: peer.info.name,
+        peers: getPeerList()
+      });
+      console.log(`[MeshHub] Cleaned up inactive peer: ${peer.info.name} (${peerId})`);
+    }
+  }
+}, 20000);
 
-wss.on('close', () => clearInterval(heartbeatInterval));
+wss.on('close', () => clearInterval(safeCleanupInterval));
 
 server.listen(PORT, () => {
   console.log('\n======================================================');
