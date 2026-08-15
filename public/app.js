@@ -1932,15 +1932,19 @@
     state.disappearingSeconds = seconds;
     localStorage.setItem('mesh_disappearing_sec', seconds);
 
-    if (seconds > 0) {
-      const label = seconds < 60 ? `${seconds}s` : (seconds < 3600 ? `${Math.round(seconds/60)}m` : `${Math.round(seconds/3600)}h`);
-      elements.disappearingBadge.textContent = label;
-      elements.disappearingBadge.style.display = 'inline-block';
-    } else {
-      elements.disappearingBadge.style.display = 'none';
+    if (elements.disappearingBadge) {
+      if (seconds > 0) {
+        const label = seconds < 60 ? `${seconds}s` : (seconds < 3600 ? `${Math.round(seconds/60)}m` : `${Math.round(seconds/3600)}h`);
+        elements.disappearingBadge.textContent = label;
+        elements.disappearingBadge.style.display = 'inline-block';
+      } else {
+        elements.disappearingBadge.style.display = 'none';
+      }
     }
 
-    elements.disappearingModalOverlay.classList.remove('active');
+    if (elements.disappearingModalOverlay) {
+      elements.disappearingModalOverlay.classList.remove('active');
+    }
   }
 
   setInterval(() => {
@@ -2388,8 +2392,9 @@
 
   function renderRadarLoop() {
     const canvas = elements.tacticalRadarCanvas;
-    if (!canvas) return;
+    if (!canvas || !canvas.getContext) return;
     const ctx = canvas.getContext('2d');
+    if (!ctx) return;
     const w = canvas.width;
     const h = canvas.height;
     const cx = w / 2;
@@ -3158,9 +3163,12 @@
   }
 
   function resizeAndDrawMap() {
-    const rect = elements.offlineMapCanvas.parentElement.getBoundingClientRect();
-    elements.offlineMapCanvas.width = rect.width;
-    elements.offlineMapCanvas.height = rect.height;
+    if (!elements.offlineMapCanvas) return;
+    const parent = elements.offlineMapCanvas.parentElement;
+    if (!parent || !parent.getBoundingClientRect) return;
+    const rect = parent.getBoundingClientRect();
+    elements.offlineMapCanvas.width = rect.width || 800;
+    elements.offlineMapCanvas.height = rect.height || 600;
     drawMap();
   }
 
@@ -4890,115 +4898,127 @@
     if (elements.btnRollcallHelp) elements.btnRollcallHelp.addEventListener('click', () => submitRollCallResponse('help'));
 
     // Chat Form & Attachments
-    elements.chatForm.addEventListener('submit', handleSendMessage);
-    elements.voiceRecordBtn.addEventListener('click', toggleVoiceRecording);
-    elements.attachFileBtn.addEventListener('click', () => elements.fileInput.click());
-    elements.fileInput.addEventListener('change', handleFileSelect);
+    if (elements.chatForm) elements.chatForm.addEventListener('submit', handleSendMessage);
+    if (elements.voiceRecordBtn) elements.voiceRecordBtn.addEventListener('click', toggleVoiceRecording);
+    if (elements.attachFileBtn && elements.fileInput) {
+      elements.attachFileBtn.addEventListener('click', () => elements.fileInput.click());
+    }
+    if (elements.fileInput) elements.fileInput.addEventListener('change', handleFileSelect);
 
     // Sketch Canvas
-    elements.btnOpenSketch.addEventListener('click', openSketchModal);
-    elements.sketchModalCloseBtn.addEventListener('click', closeSketchModal);
-    elements.btnClearSketch.addEventListener('click', clearSketchCanvas);
-    elements.btnSendSketch.addEventListener('click', sendSketch);
+    if (elements.btnOpenSketch) elements.btnOpenSketch.addEventListener('click', openSketchModal);
+    if (elements.sketchModalCloseBtn) elements.sketchModalCloseBtn.addEventListener('click', closeSketchModal);
+    if (elements.btnClearSketch) elements.btnClearSketch.addEventListener('click', clearSketchCanvas);
+    if (elements.btnSendSketch) elements.btnSendSketch.addEventListener('click', sendSketch);
 
     // Location Sharing
-    elements.btnShareLocation.addEventListener('click', shareLocation);
+    if (elements.btnShareLocation) elements.btnShareLocation.addEventListener('click', shareLocation);
 
     // Map Controls & Waypoints
-    elements.btnDropWaypoint.addEventListener('click', openWaypointModal);
-    elements.waypointModalCloseBtn.addEventListener('click', closeWaypointModal);
-    elements.btnConfirmWaypoint.addEventListener('click', saveWaypoint);
-    elements.btnRecenterMap.addEventListener('click', () => drawMap());
+    if (elements.btnDropWaypoint) elements.btnDropWaypoint.addEventListener('click', openWaypointModal);
+    if (elements.waypointModalCloseBtn) elements.waypointModalCloseBtn.addEventListener('click', closeWaypointModal);
+    if (elements.btnConfirmWaypoint) elements.btnConfirmWaypoint.addEventListener('click', saveWaypoint);
+    if (elements.btnRecenterMap) elements.btnRecenterMap.addEventListener('click', () => drawMap());
 
-    elements.waypointIconPalette.querySelectorAll('.stroke-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        elements.waypointIconPalette.querySelectorAll('.stroke-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        pttSelectedIcon = btn.dataset.icon;
+    if (elements.waypointIconPalette) {
+      elements.waypointIconPalette.querySelectorAll('.stroke-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          elements.waypointIconPalette.querySelectorAll('.stroke-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          pttSelectedIcon = btn.dataset.icon;
+        });
       });
-    });
+    }
 
     // Walkie-Talkie Touch Handlers
     const pttBtn = elements.btnPttGiant;
-    pttBtn.addEventListener('contextmenu', (e) => e.preventDefault());
+    if (pttBtn) {
+      pttBtn.addEventListener('contextmenu', (e) => e.preventDefault());
 
-    pttBtn.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      if (!state.ptt.isLocked && !state.vox.enabled) startPttTransmission();
-    }, { passive: false });
+      pttBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (!state.ptt.isLocked && !state.vox.enabled) startPttTransmission();
+      }, { passive: false });
 
-    pttBtn.addEventListener('touchend', (e) => {
-      e.preventDefault();
-      if (!state.ptt.isLocked && !state.vox.enabled) stopPttTransmission();
-    }, { passive: false });
+      pttBtn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        if (!state.ptt.isLocked && !state.vox.enabled) stopPttTransmission();
+      }, { passive: false });
 
-    pttBtn.addEventListener('touchcancel', (e) => {
-      e.preventDefault();
-      if (!state.ptt.isLocked && !state.vox.enabled) stopPttTransmission();
-    }, { passive: false });
+      pttBtn.addEventListener('touchcancel', (e) => {
+        e.preventDefault();
+        if (!state.ptt.isLocked && !state.vox.enabled) stopPttTransmission();
+      }, { passive: false });
 
-    pttBtn.addEventListener('mousedown', (e) => {
-      e.preventDefault();
-      if (!state.ptt.isLocked && !state.vox.enabled) startPttTransmission();
-    });
+      pttBtn.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        if (!state.ptt.isLocked && !state.vox.enabled) startPttTransmission();
+      });
 
-    window.addEventListener('mouseup', () => {
-      if (!state.ptt.isLocked && !state.vox.enabled && state.ptt.isTransmitting) stopPttTransmission();
-    });
+      window.addEventListener('mouseup', () => {
+        if (!state.ptt.isLocked && !state.vox.enabled && state.ptt.isTransmitting) stopPttTransmission();
+      });
+    }
 
     if (elements.btnToggleMicLock) elements.btnToggleMicLock.addEventListener('click', toggleMicLock);
     if (elements.btnToggleVox) elements.btnToggleVox.addEventListener('click', toggleVoxMode);
 
     // Encryption Settings
-    elements.btnOpenEncryption.addEventListener('click', openEncryptionModal);
-    elements.encryptionModalCloseBtn.addEventListener('click', closeEncryptionModal);
-    elements.btnSaveEncryption.addEventListener('click', saveEncryptionPassphrase);
+    if (elements.btnOpenEncryption) elements.btnOpenEncryption.addEventListener('click', openEncryptionModal);
+    if (elements.encryptionModalCloseBtn) elements.encryptionModalCloseBtn.addEventListener('click', closeEncryptionModal);
+    if (elements.btnSaveEncryption) elements.btnSaveEncryption.addEventListener('click', saveEncryptionPassphrase);
 
     // Search & Export
-    elements.searchInput.addEventListener('input', handleSearchInput);
-    elements.btnClearSearch.addEventListener('click', clearSearch);
-    elements.btnExportChat.addEventListener('click', exportChatTranscript);
-    elements.btnCancelReply.addEventListener('click', cancelReply);
+    if (elements.searchInput) elements.searchInput.addEventListener('input', handleSearchInput);
+    if (elements.btnClearSearch) elements.btnClearSearch.addEventListener('click', clearSearch);
+    if (elements.btnExportChat) elements.btnExportChat.addEventListener('click', exportChatTranscript);
+    if (elements.btnCancelReply) elements.btnCancelReply.addEventListener('click', cancelReply);
 
     // Call Buttons
-    elements.btnAudioCall.addEventListener('click', () => initiateCall(false));
-    elements.btnVideoCall.addEventListener('click', () => initiateCall(true));
+    if (elements.btnAudioCall) elements.btnAudioCall.addEventListener('click', () => initiateCall(false));
+    if (elements.btnVideoCall) elements.btnVideoCall.addEventListener('click', () => initiateCall(true));
 
-    elements.btnIncomingAccept.addEventListener('click', acceptIncomingCall);
-    elements.btnIncomingDecline.addEventListener('click', rejectIncomingCall);
+    if (elements.btnIncomingAccept) elements.btnIncomingAccept.addEventListener('click', acceptIncomingCall);
+    if (elements.btnIncomingDecline) elements.btnIncomingDecline.addEventListener('click', rejectIncomingCall);
 
-    elements.btnCallMute.addEventListener('click', toggleCallMute);
-    elements.btnCallVideoToggle.addEventListener('click', toggleCallVideo);
-    elements.btnCallEnd.addEventListener('click', () => endCall(true));
+    if (elements.btnCallMute) elements.btnCallMute.addEventListener('click', toggleCallMute);
+    if (elements.btnCallVideoToggle) elements.btnCallVideoToggle.addEventListener('click', toggleCallVideo);
+    if (elements.btnCallEnd) elements.btnCallEnd.addEventListener('click', () => endCall(true));
 
-    elements.profileNameInput.addEventListener('change', (e) => {
-      state.self.name = e.target.value.trim() || 'User';
-      localStorage.setItem('mesh_peer_name', state.self.name);
-      if (state.ws && state.ws.readyState === WebSocket.OPEN) {
-        state.ws.send(JSON.stringify({ type: 'JOIN', peer: state.self }));
-      }
-    });
+    if (elements.profileNameInput) {
+      elements.profileNameInput.addEventListener('change', (e) => {
+        state.self.name = e.target.value.trim() || 'User';
+        localStorage.setItem('mesh_peer_name', state.self.name);
+        if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+          state.ws.send(JSON.stringify({ type: 'JOIN', peer: state.self }));
+        }
+      });
+    }
 
-    elements.qrShareBtn.addEventListener('click', openQRModal);
-    elements.qrModalCloseBtn.addEventListener('click', closeQRModal);
-    elements.qrModalDoneBtn.addEventListener('click', closeQRModal);
-    elements.qrModalOverlay.addEventListener('click', (e) => {
-      if (e.target === elements.qrModalOverlay) closeQRModal();
-    });
+    if (elements.qrShareBtn) elements.qrShareBtn.addEventListener('click', openQRModal);
+    if (elements.qrModalCloseBtn) elements.qrModalCloseBtn.addEventListener('click', closeQRModal);
+    if (elements.qrModalDoneBtn) elements.qrModalDoneBtn.addEventListener('click', closeQRModal);
+    if (elements.qrModalOverlay) {
+      elements.qrModalOverlay.addEventListener('click', (e) => {
+        if (e.target === elements.qrModalOverlay) closeQRModal();
+      });
+    }
 
-    elements.menuToggleBtn.addEventListener('click', openSidebarDrawer);
+    if (elements.menuToggleBtn) elements.menuToggleBtn.addEventListener('click', openSidebarDrawer);
 
     let typingTimeout = null;
-    elements.chatMessageInput.addEventListener('input', () => {
-      if (!state.ws || state.ws.readyState !== WebSocket.OPEN) return;
-      state.ws.send(JSON.stringify({ type: 'TYPING', isTyping: true }));
-      clearTimeout(typingTimeout);
-      typingTimeout = setTimeout(() => {
-        if (state.ws && state.ws.readyState === WebSocket.OPEN) {
-          state.ws.send(JSON.stringify({ type: 'TYPING', isTyping: false }));
-        }
-      }, 1500);
-    });
+    if (elements.chatMessageInput) {
+      elements.chatMessageInput.addEventListener('input', () => {
+        if (!state.ws || state.ws.readyState !== WebSocket.OPEN) return;
+        state.ws.send(JSON.stringify({ type: 'TYPING', isTyping: true }));
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => {
+          if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+            state.ws.send(JSON.stringify({ type: 'TYPING', isTyping: false }));
+          }
+        }, 1500);
+      });
+    }
 
     window.addEventListener('resize', () => {
       if (state.activeView === 'map') resizeAndDrawMap();
@@ -5009,8 +5029,10 @@
 
   // --- 48. Bootstrap ---
   async function init() {
-    elements.profileNameInput.value = state.self.name;
-    elements.selfIdTag.textContent = `ID: ${state.self.id}`;
+    initEventListeners();
+
+    if (elements.profileNameInput) elements.profileNameInput.value = state.self.name;
+    if (elements.selfIdTag) elements.selfIdTag.textContent = `ID: ${state.self.id}`;
 
     applyCustomTheme();
     renderChannelsList();
@@ -5018,16 +5040,23 @@
     setDisappearingTimer(state.disappearingSeconds);
     renderPinnedBanner();
 
-    await initCryptoKey(state.passphrase);
-    await initDatabase();
-
-    const stored = await loadStoredMessages();
-    if (stored.length > 0) {
-      state.messages = stored;
-      renderMessagesForActiveTarget();
+    try {
+      await initCryptoKey(state.passphrase);
+    } catch (e) {
+      console.warn('[Crypto] Init key fallback:', e);
     }
 
-    initEventListeners();
+    try {
+      await initDatabase();
+      const stored = await loadStoredMessages();
+      if (stored && stored.length > 0) {
+        state.messages = stored;
+        renderMessagesForActiveTarget();
+      }
+    } catch (e) {
+      console.warn('[Storage] DB fallback:', e);
+    }
+
     initMapEngine();
     initCompassSensor();
     initBatteryMonitor();
