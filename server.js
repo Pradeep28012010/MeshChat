@@ -41,10 +41,17 @@ function getLocalIPAddresses() {
   return addresses;
 }
 
-// Serve static frontend files with caching
+// Serve static frontend files with fresh cache-control headers
 app.use(express.static(path.join(__dirname, 'public'), {
-  maxAge: '1h',
-  etag: true
+  maxAge: 0,
+  etag: false,
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html') || filePath.endsWith('.js') || filePath.endsWith('.css') || filePath.endsWith('sw.js')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  }
 }));
 app.use(express.json({ limit: '50mb' }));
 

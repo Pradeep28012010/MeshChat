@@ -1,4 +1,4 @@
-const CACHE_NAME = 'meshchat-apple-v2';
+const CACHE_NAME = 'meshchat-v3.1-live';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -8,21 +8,24 @@ const ASSETS_TO_CACHE = [
 ];
 
 self.addEventListener('install', (event) => {
+  // Force new service worker to activate immediately
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('[ServiceWorker] Pre-caching offline assets');
+      console.log('[ServiceWorker] Pre-caching latest assets');
       return cache.addAll(ASSETS_TO_CACHE);
-    }).then(() => self.skipWaiting())
+    })
   );
 });
 
 self.addEventListener('activate', (event) => {
+  // Purge ALL older caches immediately
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
         keys.map((key) => {
           if (key !== CACHE_NAME) {
-            console.log('[ServiceWorker] Removing old cache', key);
+            console.log('[ServiceWorker] Purging stale cache:', key);
             return caches.delete(key);
           }
         })
@@ -32,31 +35,34 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Pass through WebSocket and dynamic API calls
-  if (event.request.url.includes('/ws') || event.request.url.includes('/api/info')) {
+  const url = event.request.url;
+
+  // Pass through WebSocket, dynamic APIs, and ping checks directly
+  if (url.includes('/ws') || url.includes('/api/') || url.includes('/ping') || url.includes('/health')) {
     return;
   }
 
+  // Network-First Strategy for all HTML, CSS, JS and static assets
+  // Guarantees latest version on refresh, while preserving 100% offline fallback
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      return fetch(event.request).then((response) => {
-        // Cache newly fetched static assets
-        if (response && response.status === 200 && response.type === 'basic') {
-          const responseToCache = response.clone();
+    fetch(event.request)
+      .then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+          const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(event.request, responseToCache);
           });
         }
-        return response;
-      }).catch(() => {
-        // Offline fallback for navigation
-        if (event.request.mode === 'navigate') {
-          return caches.match('./index.html');
-        }
-      });
-    })
+        return networkResponse;
+      })
+      .catch(() => {
+        // When offline (no network / no server), fallback to cache
+        return caches.match(event.request).then((cachedResponse) => {
+          if (cachedResponse) return cachedResponse;
+          if (event.request.mode === 'navigate') {
+            return caches.match('./index.html');
+          }
+        });
+      })
   );
 });
