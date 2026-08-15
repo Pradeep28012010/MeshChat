@@ -141,6 +141,14 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
           <span>Geofence</span>
         </button>
+        <button class="quick-act-btn" id="btn-open-morse" title="Optical Morse Code Strobe">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <span>Morse Strobe</span>
+        </button>
+        <button class="quick-act-btn" id="btn-open-radar" title="Tactical 360° Radar HUD">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10"/><path d="m12 12 7-7"/></svg>
+          <span>Tactical Radar</span>
+        </button>
         <button class="quick-act-btn" id="btn-open-encryption" title="Encryption Key">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
           <span>Passphrase</span>
@@ -784,6 +792,78 @@
       </div>
 
     </div>
+  </div>
+
+  <!-- 🔦 Optical Morse Code Screen & Torch Strobe Modal -->
+  <div class="modal-overlay" id="morse-modal-overlay">
+    <div class="modal-card morse-modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">🔦 Optical Morse Code Flasher</h3>
+          <p class="modal-subtitle">Visual optical signaling for night / mountain rescue</p>
+        </div>
+        <button class="close-btn" id="morse-modal-close-btn">&times;</button>
+      </div>
+
+      <div class="morse-control-body">
+        <div class="field-group" style="margin-bottom: 12px;">
+          <label class="ip-section-label" for="morse-text-input">Message to Transmit:</label>
+          <input type="text" class="text-input-field" id="morse-text-input" value="SOS" placeholder="Type text to flash in Morse...">
+        </div>
+
+        <div class="morse-presets-row">
+          <button class="ai-chip" data-morse="SOS">🚨 SOS</button>
+          <button class="ai-chip" data-morse="HELP">⚠️ HELP</button>
+          <button class="ai-chip" data-morse="OK">✅ OK</button>
+          <button class="ai-chip" data-morse="HERE">📍 HERE</button>
+        </div>
+
+        <div class="morse-visual-screen" id="morse-screen-preview">
+          <span class="morse-char-indicator" id="morse-char-indicator">READY</span>
+          <span class="morse-code-sub" id="morse-code-sub">· · · — — — · · ·</span>
+        </div>
+
+        <div class="morse-actions-row">
+          <button class="btn btn-primary" id="btn-start-morse" style="flex: 1;">▶ Start Optical Flasher</button>
+          <button class="btn btn-secondary" id="btn-stop-morse" style="display: none; flex: 1;">⏹ Stop Flasher</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🎯 Tactical 360° Sonar / Radar HUD Modal -->
+  <div class="modal-overlay" id="radar-modal-overlay">
+    <div class="modal-card radar-modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">🎯 Tactical 360° Radar HUD</h3>
+          <p class="modal-subtitle">Real-time sonar positioning & team blips</p>
+        </div>
+        <button class="close-btn" id="radar-modal-close-btn">&times;</button>
+      </div>
+
+      <div class="radar-viewport-container">
+        <canvas id="tactical-radar-canvas" width="340" height="340"></canvas>
+      </div>
+
+      <div class="radar-legend-bar">
+        <div class="radar-legend-item"><span class="legend-dot self"></span> You (Center)</div>
+        <div class="radar-legend-item"><span class="legend-dot peer"></span> Teammates</div>
+        <div class="radar-legend-item"><span class="legend-dot wp"></span> Waypoints</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 📦 Chunked P2P File Transfer Toast -->
+  <div class="chunked-transfer-toast" id="chunked-transfer-toast" style="display: none;">
+    <div class="transfer-toast-header">
+      <span class="transfer-toast-title" id="transfer-toast-title">📦 Sharing Map File...</span>
+      <span class="transfer-toast-percent" id="transfer-toast-percent">0%</span>
+    </div>
+    <div class="transfer-progress-track">
+      <div class="transfer-progress-fill" id="transfer-progress-fill" style="width: 0%;"></div>
+    </div>
+    <div class="transfer-toast-sub" id="transfer-toast-sub">Chunk 0 / 0 • Validating SHA-256</div>
   </div>
 
   <script src="./app.js"></script>

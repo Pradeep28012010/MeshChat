@@ -363,6 +363,49 @@ wss.on('connection', (ws, req) => {
           break;
         }
 
+        // Multi-Hop Mesh Packet Relay Engine
+        case 'RELAY_PACKET': {
+          const packet = data.packet;
+          if (!packet || packet.hopsRemaining <= 0) break;
+          packet.hopsRemaining -= 1;
+          packet.visitedNodes = packet.visitedNodes || [];
+          if (!packet.visitedNodes.includes(currentPeerId)) {
+            packet.visitedNodes.push(currentPeerId);
+          }
+
+          if (packet.targetId && packet.targetId !== 'broadcast') {
+            sendToPeer(packet.targetId, {
+              type: 'RELAY_PACKET',
+              packet: packet
+            });
+          } else {
+            broadcast({
+              type: 'RELAY_PACKET',
+              packet: packet
+            }, ws);
+          }
+          break;
+        }
+
+        // Chunked P2P File Transfer Signaling
+        case 'FILE_TRANSFER_OFFER':
+        case 'FILE_TRANSFER_CHUNK':
+        case 'FILE_TRANSFER_ACK':
+        case 'FILE_TRANSFER_COMPLETE': {
+          if (data.targetId && data.targetId !== 'broadcast') {
+            sendToPeer(data.targetId, {
+              ...data,
+              senderId: currentPeerId
+            });
+          } else {
+            broadcast({
+              ...data,
+              senderId: currentPeerId
+            }, ws);
+          }
+          break;
+        }
+
         // General WebRTC Data Signaling Relay for local peers
         case 'WEBRTC_SIGNAL': {
           if (data.targetId) {

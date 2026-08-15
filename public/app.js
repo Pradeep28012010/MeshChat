@@ -1,12 +1,21 @@
 /**
- * MeshChat — Zero-Internet Messaging, Calling, GPS Map, Walkie-Talkie & Survival Suite
- * Advanced Modules: Compass HUD, Offline AI Survival, Geofencing, VOX Hands-Free & Elevation Tracker
+ * MeshChat — Zero-Internet Messaging, Calling, GPS Map, Walkie-Talkie & Wilderness Survival Suite
+ * Next-Gen Modules:
+ * - 🧭 360° Digital Compass & Peer Direction HUD
+ * - 🤖 100% Offline AI Survival Assistant (Neural Pattern Reasoner)
+ * - 🚨 Geofence Perimeter & "Lost Hiker" Proximity Alarm
+ * - 🎙️ VOX Hands-Free Voice-Activated Walkie-Talkie
+ * - ⛰️ Elevation Profile & Storm Risk Predictor
+ * - 📡 Multi-Hop Mesh Packet Relay Engine
+ * - 🔦 Optical Morse Code Screen & Torch Strobe Flasher
+ * - 🎯 Tactical 360° Sonar / Radar HUD View
+ * - 📦 Chunked P2P File Exchanger & Map Exchanger
  */
 
 (function () {
   'use strict';
 
-  // --- 1. Sound Synthesizer (Web Audio API - Cues, Ringtone, Squelch, SOS & Geofence Alarm) ---
+  // --- 1. Sound Synthesizer (Web Audio API - Cues, Ringtone, Squelch, Morse & Alarms) ---
   const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   
   function playSound(type) {
@@ -75,6 +84,22 @@
         osc.stop(now + i * 0.15 + 0.12);
       });
     }
+  }
+
+  // Play short audio beep for Morse code
+  function playMorseBeep(durationMs) {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const now = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(800, now);
+    gain.gain.setValueAtTime(0.15, now);
+    gain.gain.setValueAtTime(0, now + durationMs / 1000);
+    osc.start(now);
+    osc.stop(now + durationMs / 1000);
   }
 
   // SOS Morse Code Siren Loop (... --- ...)
@@ -301,6 +326,7 @@
     isRecording: false,
     mediaRecorder: null,
     audioChunks: [],
+    seenRelayPackets: new Set(),
     
     // Geofence Perimeter
     geofence: {
@@ -318,6 +344,24 @@
       micStream: null,
       silenceTimer: null,
       animFrame: null
+    },
+
+    // Optical Morse Strobe
+    morse: {
+      isPlaying: false,
+      timer: null
+    },
+
+    // Tactical Radar
+    radar: {
+      animFrame: null,
+      sweepAngle: 0
+    },
+
+    // Chunked File Transfer
+    chunkedTransfer: {
+      active: false,
+      buffers: new Map() // transferId -> { chunks: [], totalChunks, fileName, fileSize }
     },
 
     // SOS Beacon
@@ -411,6 +455,30 @@
     geofenceRadiusLabel: document.getElementById('geofence-radius-label'),
     geofenceActiveToggle: document.getElementById('geofence-active-toggle'),
     btnSaveGeofence: document.getElementById('btn-save-geofence'),
+
+    // Optical Morse Strobe
+    btnOpenMorse: document.getElementById('btn-open-morse'),
+    morseModalOverlay: document.getElementById('morse-modal-overlay'),
+    morseModalCloseBtn: document.getElementById('morse-modal-close-btn'),
+    morseTextInput: document.getElementById('morse-text-input'),
+    morseScreenPreview: document.getElementById('morse-screen-preview'),
+    morseCharIndicator: document.getElementById('morse-char-indicator'),
+    morseCodeSub: document.getElementById('morse-code-sub'),
+    btnStartMorse: document.getElementById('btn-start-morse'),
+    btnStopMorse: document.getElementById('btn-stop-morse'),
+
+    // Tactical Radar
+    btnOpenRadar: document.getElementById('btn-open-radar'),
+    radarModalOverlay: document.getElementById('radar-modal-overlay'),
+    radarModalCloseBtn: document.getElementById('radar-modal-close-btn'),
+    tacticalRadarCanvas: document.getElementById('tactical-radar-canvas'),
+
+    // Chunked File Transfer Toast
+    chunkedTransferToast: document.getElementById('chunked-transfer-toast'),
+    transferToastTitle: document.getElementById('transfer-toast-title'),
+    transferToastPercent: document.getElementById('transfer-toast-percent'),
+    transferProgressFill: document.getElementById('transfer-progress-fill'),
+    transferToastSub: document.getElementById('transfer-toast-sub'),
 
     // SOS & Survival
     btnSosBeacon: document.getElementById('btn-sos-beacon'),
@@ -681,7 +749,7 @@
     return (θ * 180 / Math.PI + 360) % 360;
   }
 
-  // --- 9. 🤖 100% Offline AI Survival Assistant (Neural Pattern Reasoner) ---
+  // --- 9. 🤖 100% Offline AI Survival Assistant ---
   const OFFLINE_AI_KNOWLEDGE = [
     {
       keywords: ['snake', 'bite', 'viper', 'rattlesnake', 'cobra', 'venom'],
@@ -727,7 +795,6 @@
     appendAiBubble('user', userPrompt);
     elements.aiUserQuery.value = '';
 
-    // Search intelligent corpus
     let bestMatch = null;
     let maxHits = 0;
 
@@ -778,7 +845,6 @@
     let centerLat = state.geofence.originCoords ? state.geofence.originCoords.latitude : null;
     let centerLon = state.geofence.originCoords ? state.geofence.originCoords.longitude : null;
 
-    // Default center is the first recorded point
     if (!centerLat && state.myTrail.length > 0) {
       centerLat = state.myTrail[0].lat;
       centerLon = state.myTrail[0].lon;
@@ -971,18 +1037,338 @@
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Ascent stats
     const ascent = Math.max(0, maxAlt - minAlt);
     elements.elevGainStat.textContent = `Ascent: +${ascent}m (Max: ${maxAlt}m)`;
 
-    // Mountain Storm Risk Predictor
     const stormRisk = ascent > 400 ? 'Moderate (Altitude Front)' : 'Low';
     elements.stormProbStat.textContent = `Storm Risk: ${stormRisk}`;
     elements.weatherRiskPill.textContent = stormRisk === 'Low' ? '⛅ Fair Weather' : '⛈️ Barometric Front';
     elements.weatherRiskPill.classList.toggle('warning', stormRisk !== 'Low');
   }
 
-  // --- 13. Emergency SOS Beacon & Strobe Engine ---
+  // --- 13. 🔦 Optical Screen & Torch Morse Code Flasher Engine ---
+  const MORSE_MAP = {
+    'A': '.-', 'B': '-...', 'C': '-.-.', 'D': '-..', 'E': '.', 'F': '..-.',
+    'G': '--.', 'H': '....', 'I': '..', 'J': '.---', 'K': '-.-', 'L': '.-..',
+    'M': '--', 'N': '-.', 'O': '---', 'P': '.--.', 'Q': '--.-', 'R': '.-.',
+    'S': '...', 'T': '-', 'U': '..-', 'V': '...-', 'W': '.--', 'X': '-..-',
+    'Y': '-.--', 'Z': '--..', '1': '.----', '2': '..---', '3': '...--',
+    '4': '....-', '5': '.....', '6': '-....', '7': '--...', '8': '---..',
+    '9': '----.', '0': '-----', ' ': ' '
+  };
+
+  async function startOpticalMorseFlasher() {
+    const rawText = elements.morseTextInput.value.trim().toUpperCase() || 'SOS';
+    state.morse.isPlaying = true;
+    elements.btnStartMorse.style.display = 'none';
+    elements.btnStopMorse.style.display = 'block';
+
+    const unitMs = 180;
+    const sleep = (ms) => new Promise(r => { state.morse.timer = setTimeout(r, ms); });
+
+    try {
+      while (state.morse.isPlaying) {
+        for (let i = 0; i < rawText.length; i++) {
+          if (!state.morse.isPlaying) break;
+          const ch = rawText[i];
+          const morseSeq = MORSE_MAP[ch] || '';
+
+          elements.morseCharIndicator.textContent = ch;
+          elements.morseCodeSub.textContent = morseSeq.split('').join(' ');
+
+          for (let j = 0; j < morseSeq.length; j++) {
+            if (!state.morse.isPlaying) break;
+            const sym = morseSeq[j];
+            const duration = sym === '-' ? unitMs * 3 : unitMs;
+
+            // Flash ON
+            elements.morseScreenPreview.classList.add('flash-white');
+            playMorseBeep(duration);
+            if (state.sos.torchTrack) {
+              try { state.sos.torchTrack.applyConstraints({ advanced: [{ torch: true }] }); } catch(e) {}
+            }
+
+            await sleep(duration);
+
+            // Flash OFF
+            elements.morseScreenPreview.classList.remove('flash-white');
+            if (state.sos.torchTrack) {
+              try { state.sos.torchTrack.applyConstraints({ advanced: [{ torch: false }] }); } catch(e) {}
+            }
+
+            await sleep(unitMs); // Intra-character gap
+          }
+
+          await sleep(unitMs * 2); // Inter-character gap
+        }
+
+        await sleep(unitMs * 5); // Loop gap
+      }
+    } catch (e) {
+      console.warn('[Morse] Play error:', e);
+    } finally {
+      stopOpticalMorseFlasher();
+    }
+  }
+
+  function stopOpticalMorseFlasher() {
+    state.morse.isPlaying = false;
+    if (state.morse.timer) clearTimeout(state.morse.timer);
+    elements.morseScreenPreview.classList.remove('flash-white');
+    elements.morseCharIndicator.textContent = 'READY';
+    elements.btnStartMorse.style.display = 'block';
+    elements.btnStopMorse.style.display = 'none';
+    if (state.sos.torchTrack) {
+      try { state.sos.torchTrack.applyConstraints({ advanced: [{ torch: false }] }); } catch(e) {}
+    }
+  }
+
+  // --- 14. 🎯 Tactical 360° Sonar / Radar Canvas Engine ---
+  function initTacticalRadar() {
+    elements.radarModalOverlay.classList.add('active');
+    renderRadarLoop();
+  }
+
+  function renderRadarLoop() {
+    const canvas = elements.tacticalRadarCanvas;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
+    const cx = w / 2;
+    const cy = h / 2;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Background radial glow
+    const bgGrad = ctx.createRadialGradient(cx, cy, 10, cx, cy, cx);
+    bgGrad.addColorStop(0, '#0f172a');
+    bgGrad.addColorStop(1, '#090d16');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, w, h);
+
+    // Concentric Range Rings (25m, 50m, 100m, 200m)
+    [35, 70, 110, 150].forEach((r, idx) => {
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(0, 122, 255, 0.25)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.fillStyle = 'rgba(0, 122, 255, 0.6)';
+      ctx.font = '9px monospace';
+      ctx.fillText(`${(idx + 1) * 50}m`, cx + r - 20, cy - 3);
+    });
+
+    // Crosshairs
+    ctx.beginPath();
+    ctx.moveTo(cx, 0); ctx.lineTo(cx, h);
+    ctx.moveTo(0, cy); ctx.lineTo(w, cy);
+    ctx.strokeStyle = 'rgba(0, 122, 255, 0.15)';
+    ctx.stroke();
+
+    // Rotating Sweep Line
+    state.radar.sweepAngle = (state.radar.sweepAngle + 0.03) % (Math.PI * 2);
+    const sweepX = cx + Math.cos(state.radar.sweepAngle) * (cx - 10);
+    const sweepY = cy + Math.sin(state.radar.sweepAngle) * (cy - 10);
+
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(sweepX, sweepY);
+    ctx.strokeStyle = '#007aff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Draw Teammates on Radar
+    if (state.myCoords) {
+      state.peerLocations.forEach((peer, peerId) => {
+        if (peerId === state.self.id || !peer.coords) return;
+        const rawBearing = calculateRawBearing(state.myCoords.latitude, state.myCoords.longitude, peer.coords.latitude, peer.coords.longitude);
+        const relBearing = (rawBearing - state.myHeading + 360) % 360;
+        const rad = (relBearing - 90) * Math.PI / 180;
+
+        // Approx distance scaling to 150px
+        const distPx = Math.min(140, Math.max(30, 70));
+        const px = cx + Math.cos(rad) * distPx;
+        const py = cy + Math.sin(rad) * distPx;
+
+        // Blip Glow
+        ctx.beginPath();
+        ctx.arc(px, py, 9, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 149, 0, 0.3)';
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(px, py, 5, 0, Math.PI * 2);
+        ctx.fillStyle = '#ff9500';
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 10px sans-serif';
+        ctx.fillText(peer.name || 'Peer', px + 8, py + 3);
+      });
+    }
+
+    // Center Self Blip
+    ctx.beginPath();
+    ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+    ctx.fillStyle = '#007aff';
+    ctx.fill();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    if (elements.radarModalOverlay.classList.contains('active')) {
+      state.radar.animFrame = requestAnimationFrame(renderRadarLoop);
+    }
+  }
+
+  // --- 15. 📡 Multi-Hop Mesh Packet Relay Engine ---
+  async function dispatchMeshRelayPacket(payload, targetId = 'broadcast') {
+    const packet = {
+      id: 'pkt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+      originSenderId: state.self.id,
+      originSenderName: state.self.name,
+      targetId: targetId,
+      hopsRemaining: 3,
+      hopsTaken: 0,
+      visitedNodes: [state.self.id],
+      payload: payload,
+      timestamp: Date.now()
+    };
+
+    state.seenRelayPackets.add(packet.id);
+
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+      state.ws.send(JSON.stringify({
+        type: 'RELAY_PACKET',
+        packet: packet
+      }));
+    }
+  }
+
+  function handleIncomingRelayPacket(data) {
+    const packet = data.packet;
+    if (!packet || state.seenRelayPackets.has(packet.id)) return;
+    state.seenRelayPackets.add(packet.id);
+
+    packet.hopsTaken = (packet.hopsTaken || 0) + 1;
+
+    // Is this packet meant for me or broadcast?
+    if (packet.targetId === 'broadcast' || packet.targetId === state.self.id) {
+      const msg = packet.payload;
+      if (msg) {
+        if (packet.hopsTaken > 1) {
+          msg._relayInfo = `Relayed via ${packet.visitedNodes.length - 1} mesh hops`;
+        }
+        appendMessage(msg, packet.originSenderId === state.self.id);
+      }
+    }
+  }
+
+  // --- 16. 📦 Chunked P2P File Exchanger Engine ---
+  const CHUNK_SIZE = 48 * 1024; // 48KB per chunk
+
+  async function sendFileInChunks(file, targetId = 'broadcast') {
+    const transferId = 'transfer_' + Date.now();
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+
+    elements.chunkedTransferToast.style.display = 'flex';
+    elements.transferToastTitle.textContent = `📦 Sending ${file.name}...`;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const arrayBuffer = e.target.result;
+      const base64Full = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * CHUNK_SIZE;
+        const end = Math.min(file.size, (i + 1) * CHUNK_SIZE);
+        const chunkData = base64Full.slice(start, end);
+
+        const percent = Math.round(((i + 1) / totalChunks) * 100);
+        elements.transferToastPercent.textContent = `${percent}%`;
+        elements.transferProgressFill.style.width = `${percent}%`;
+        elements.transferToastSub.textContent = `Chunk ${i + 1} / ${totalChunks} (${formatFileSize(file.size)})`;
+
+        if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+          state.ws.send(JSON.stringify({
+            type: 'FILE_TRANSFER_CHUNK',
+            transferId: transferId,
+            chunkIndex: i,
+            totalChunks: totalChunks,
+            fileName: file.name,
+            fileType: file.type,
+            fileSize: file.size,
+            targetId: targetId,
+            senderName: state.self.name,
+            chunkData: chunkData
+          }));
+        }
+
+        await new Promise(r => setTimeout(r, 40)); // Smooth chunk cadence
+      }
+
+      setTimeout(() => {
+        elements.chunkedTransferToast.style.display = 'none';
+        alert(`File "${file.name}" sent to mesh peers successfully!`);
+      }, 1000);
+    };
+
+    reader.readAsArrayBuffer(file);
+  }
+
+  function handleIncomingFileChunk(data) {
+    let job = state.chunkedTransfer.buffers.get(data.transferId);
+    if (!job) {
+      job = {
+        transferId: data.transferId,
+        fileName: data.fileName,
+        fileType: data.fileType,
+        fileSize: data.fileSize,
+        totalChunks: data.totalChunks,
+        senderName: data.senderName,
+        chunks: new Array(data.totalChunks)
+      };
+      state.chunkedTransfer.buffers.set(data.transferId, job);
+    }
+
+    job.chunks[data.chunkIndex] = data.chunkData;
+    const receivedCount = job.chunks.filter(Boolean).length;
+    const percent = Math.round((receivedCount / job.totalChunks) * 100);
+
+    elements.chunkedTransferToast.style.display = 'flex';
+    elements.transferToastTitle.textContent = `📥 Receiving ${job.fileName} from ${job.senderName}...`;
+    elements.transferToastPercent.textContent = `${percent}%`;
+    elements.transferProgressFill.style.width = `${percent}%`;
+    elements.transferToastSub.textContent = `Chunk ${receivedCount} / ${job.totalChunks}`;
+
+    if (receivedCount === job.totalChunks) {
+      const fullBase64 = job.chunks.join('');
+      const dataUrl = `data:${job.fileType};base64,${fullBase64}`;
+
+      const msg = {
+        id: 'file_' + Date.now(),
+        senderId: data.senderId || 'peer',
+        senderName: job.senderName,
+        targetId: 'broadcast',
+        fileName: job.fileName,
+        fileSize: job.fileSize,
+        fileType: job.fileType,
+        fileData: dataUrl,
+        timestamp: Date.now()
+      };
+
+      appendMessage(msg, false);
+      state.chunkedTransfer.buffers.delete(data.transferId);
+
+      setTimeout(() => {
+        elements.chunkedTransferToast.style.display = 'none';
+      }, 1500);
+    }
+  }
+
+  // --- 17. Emergency SOS Beacon & Strobe Engine ---
   async function activateSosBeacon() {
     state.sos.active = true;
     elements.sosModalOverlay.classList.add('active');
@@ -1061,7 +1447,7 @@
     }
   }
 
-  // --- 14. Offline Wilderness First-Aid & Survival Handbook ---
+  // --- 18. Offline Wilderness First-Aid & Survival Handbook ---
   const SURVIVAL_GUIDES = [
     {
       cat: 'firstaid',
@@ -1133,7 +1519,7 @@
     });
   }
 
-  // --- 15. Safety Roll Call Check-In Engine ---
+  // --- 19. Safety Roll Call Check-In Engine ---
   function startRollCall() {
     elements.rollcallModalOverlay.classList.add('active');
     elements.rollcallPromptSubtitle.textContent = 'You started a safety roll call';
@@ -1196,7 +1582,7 @@
     `;
   }
 
-  // --- 16. WebSocket Resilient Mesh Hub Client ---
+  // --- 20. WebSocket Resilient Mesh Hub Client ---
   let reconnectTimer = null;
   let clientHeartbeatInterval = null;
 
@@ -1334,6 +1720,14 @@
         break;
       }
 
+      case 'RELAY_PACKET':
+        handleIncomingRelayPacket(data);
+        break;
+
+      case 'FILE_TRANSFER_CHUNK':
+        handleIncomingFileChunk(data);
+        break;
+
       case 'MESSAGE_REACTION':
         handleIncomingReaction(data);
         break;
@@ -1413,7 +1807,7 @@
     }
   }
 
-  // --- 17. Walkie-Talkie Push-to-Talk (PTT) Touch & Compressed Audio ---
+  // --- 21. Walkie-Talkie Push-to-Talk (PTT) ---
   let pttSelectedIcon = '⛺';
 
   async function startPttTransmission() {
@@ -1515,7 +1909,7 @@
     elements.pttLogList.prepend(item);
   }
 
-  // --- 18. GPS Map Engine, Breadcrumbs & Geofence Boundary ---
+  // --- 22. GPS Map Engine & Breadcrumbs ---
   let mapCanvasCtx = null;
 
   function initMapEngine() {
@@ -1550,10 +1944,8 @@
           localStorage.setItem('mesh_my_trail', JSON.stringify(state.myTrail));
         }
 
-        // Check Geofence
         checkGeofenceProximity(state.myCoords.latitude, state.myCoords.longitude);
 
-        // Throttled GPS Broadcast (once per 3.5s)
         const now = Date.now();
         if (!state._lastGpsBroadcast || now - state._lastGpsBroadcast > 3500) {
           state._lastGpsBroadcast = now;
@@ -1640,7 +2032,6 @@
     const toCanvasX = (lon) => centerX + (lon - refLon) * scale;
     const toCanvasY = (lat) => centerY - (lat - refLat) * scale;
 
-    // Render Geofence Boundary Ring
     if (state.geofence.enabled && state.geofence.originCoords) {
       const gcx = toCanvasX(state.geofence.originCoords.longitude);
       const gcy = toCanvasY(state.geofence.originCoords.latitude);
@@ -1661,7 +2052,6 @@
       mapCanvasCtx.fillText(`Perimeter (${state.geofence.radiusMeters}m)`, gcx - 30, gcy - pixelRadius - 6);
     }
 
-    // Breadcrumbs
     if (state.myTrail.length > 1) {
       mapCanvasCtx.beginPath();
       mapCanvasCtx.strokeStyle = '#34c759';
@@ -1678,7 +2068,6 @@
       mapCanvasCtx.setLineDash([]);
     }
 
-    // Waypoints
     state.waypoints.forEach(wp => {
       const cx = toCanvasX(wp.lon);
       const cy = toCanvasY(wp.lat);
@@ -1691,7 +2080,6 @@
       mapCanvasCtx.fillText(wp.name, cx - 18, cy + 22);
     });
 
-    // Remote Peers
     state.peerLocations.forEach((peer, peerId) => {
       if (peerId === state.self.id || !peer.coords) return;
       const px = toCanvasX(peer.coords.longitude);
@@ -1715,7 +2103,6 @@
       mapCanvasCtx.fillText(peer.name || 'Peer', px + 10, py + 4);
     });
 
-    // Self Position with Compass Direction Cone
     mapCanvasCtx.save();
     mapCanvasCtx.translate(centerX, centerY);
     mapCanvasCtx.rotate(state.myHeading * Math.PI / 180);
@@ -1781,7 +2168,7 @@
     if (state.activeView === 'map') drawMap();
   }
 
-  // --- 19. Peer List Rendering & Battery Badges ---
+  // --- 23. Peer List Rendering ---
   function getInitials(name) {
     if (!name) return 'U';
     const parts = name.trim().split(/\s+/);
@@ -1861,7 +2248,6 @@
     closeSidebarDrawer();
   }
 
-  // --- 20. Distance & Bearing ---
   function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371e3;
     const φ1 = lat1 * Math.PI / 180;
@@ -1888,7 +2274,7 @@
     return directions[idx];
   }
 
-  // --- 21. Message Rendering & History ---
+  // --- 24. Message Rendering & History ---
   function appendMessage(msg, isSelf = false) {
     if (!msg.reactions) msg.reactions = {};
     
@@ -1961,6 +2347,10 @@
 
     const timeStr = formatTime(msg.timestamp);
     let contentHtml = '';
+
+    if (msg._relayInfo) {
+      contentHtml += `<div class="msg-relay-badge">📡 ${escapeHtml(msg._relayInfo)}</div>`;
+    }
 
     if (msg.quotedMsg) {
       contentHtml += `
@@ -2182,7 +2572,7 @@
     );
   }
 
-  // --- 22. Freeform Sketch Pad ---
+  // --- 25. Freeform Sketch Pad ---
   let canvasCtx = null;
 
   function initSketchCanvas() {
@@ -2280,7 +2670,7 @@
     await dispatchMessage(msg);
   }
 
-  // --- 23. Export Transcript ---
+  // --- 26. Export Transcript ---
   async function exportChatTranscript() {
     const allMsgs = await loadStoredMessages();
     if (allMsgs.length === 0) {
@@ -2312,7 +2702,7 @@
     URL.revokeObjectURL(url);
   }
 
-  // --- 24. Message Dispatch Helper ---
+  // --- 27. Message Dispatch Helper ---
   async function dispatchMessage(msgObj) {
     if (state.replyingTo) {
       msgObj.quotedMsg = state.replyingTo;
@@ -2327,10 +2717,13 @@
         type: 'CHAT_MESSAGE',
         message: encryptedMsg
       }));
+    } else {
+      // Offline Multi-hop attempt
+      dispatchMeshRelayPacket(msgObj, state.activeTargetId);
     }
   }
 
-  // --- 25. Voice Memo Recording ---
+  // --- 28. Voice Memo Recording ---
   async function toggleVoiceRecording() {
     if (!state.isRecording) {
       try {
@@ -2402,13 +2795,14 @@
     };
   }
 
-  // --- 26. File & Photo Sharing ---
+  // --- 29. File & Photo Sharing (with Auto Chunking if > 500KB) ---
   function handleFileSelect(e) {
     const file = e.target.files[0];
     if (!file) return;
 
-    if (file.size > 30 * 1024 * 1024) {
-      alert('File exceeds 30MB limit.');
+    if (file.size > 500 * 1024) {
+      sendFileInChunks(file, state.activeTargetId);
+      e.target.value = '';
       return;
     }
 
@@ -2451,7 +2845,7 @@
     elements.chatMessageInput.value = '';
   }
 
-  // --- 27. WebRTC Audio & Video Calling Engine ---
+  // --- 30. WebRTC Audio & Video Calling Engine ---
   async function initiateCall(isVideo) {
     if (state.activeTargetId === 'broadcast') {
       alert('Please select a specific peer from the sidebar to start a call.');
@@ -2761,7 +3155,7 @@
     elements.btnCallVideoToggle.classList.remove('muted');
   }
 
-  // --- 28. Encryption & QR Modals ---
+  // --- 31. Encryption & QR Modals ---
   function openEncryptionModal() {
     elements.roomPassphraseInput.value = state.passphrase;
     elements.encryptionModalOverlay.classList.add('active');
@@ -2852,7 +3246,7 @@
     renderMessagesForActiveTarget();
   }
 
-  // --- 29. Event Listeners Initialization ---
+  // --- 32. Event Listeners Initialization ---
   function initEventListeners() {
     // Desktop View Tabs
     if (elements.tabBtnChat) elements.tabBtnChat.addEventListener('click', () => switchView('chat'));
@@ -2882,7 +3276,8 @@
     });
     document.querySelectorAll('.ai-chip').forEach(chip => {
       chip.addEventListener('click', () => {
-        queryOfflineAiAssistant(chip.dataset.prompt);
+        if (chip.dataset.prompt) queryOfflineAiAssistant(chip.dataset.prompt);
+        if (chip.dataset.morse) elements.morseTextInput.value = chip.dataset.morse;
       });
     });
 
@@ -2898,6 +3293,24 @@
       elements.geofenceRadiusLabel.textContent = `${e.target.value} meters`;
     });
     elements.btnSaveGeofence.addEventListener('click', saveGeofenceSettings);
+
+    // Morse Strobe Modal
+    elements.btnOpenMorse.addEventListener('click', () => {
+      elements.morseModalOverlay.classList.add('active');
+    });
+    elements.morseModalCloseBtn.addEventListener('click', () => {
+      stopOpticalMorseFlasher();
+      elements.morseModalOverlay.classList.remove('active');
+    });
+    elements.btnStartMorse.addEventListener('click', startOpticalMorseFlasher);
+    elements.btnStopMorse.addEventListener('click', stopOpticalMorseFlasher);
+
+    // Tactical Radar Modal
+    elements.btnOpenRadar.addEventListener('click', initTacticalRadar);
+    elements.radarModalCloseBtn.addEventListener('click', () => {
+      elements.radarModalOverlay.classList.remove('active');
+      if (state.radar.animFrame) cancelAnimationFrame(state.radar.animFrame);
+    });
 
     // Elevation & Weather Panel
     elements.btnToggleElevationPanel.addEventListener('click', () => {
@@ -3066,7 +3479,7 @@
     });
   }
 
-  // --- 30. Bootstrap ---
+  // --- 33. Bootstrap ---
   async function init() {
     elements.profileNameInput.value = state.self.name;
     elements.selfIdTag.textContent = `ID: ${state.self.id}`;
