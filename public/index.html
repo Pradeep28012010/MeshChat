@@ -137,6 +137,18 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>
           <span>Safety Check-In</span>
         </button>
+        <button class="quick-act-btn" id="btn-open-starred" title="Starred & Bookmarked Messages">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <span>Starred</span>
+        </button>
+        <button class="quick-act-btn" id="btn-open-events" title="Shared Group Events">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <span>Events</span>
+        </button>
+        <button class="quick-act-btn" id="btn-open-games" title="Multiplayer Games (Tic-Tac-Toe, Dice)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="8" cy="12" r="2"/><circle cx="16" cy="12" r="2"/></svg>
+          <span>Games</span>
+        </button>
         <button class="quick-act-btn" id="btn-open-geofence" title="Geofence Safety Perimeter">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
           <span>Geofence</span>
@@ -167,27 +179,38 @@
         </div>
       </div>
 
+      <!-- Channels Section -->
+      <div class="sidebar-header" style="margin-top: 4px;">
+        <span class="sidebar-title">Topic Rooms</span>
+        <button class="btn-add-channel-header" id="btn-create-channel" title="Create New Channel">+</button>
+      </div>
+
+      <div class="channels-list" id="channels-list">
+        <div class="channel-item active" data-channel-id="general">
+          <span class="channel-hash">#</span>
+          <span class="channel-name">general</span>
+        </div>
+        <div class="channel-item" data-channel-id="study-group">
+          <span class="channel-hash">#</span>
+          <span class="channel-name">study-group</span>
+        </div>
+        <div class="channel-item" data-channel-id="gaming">
+          <span class="channel-hash">#</span>
+          <span class="channel-name">gaming</span>
+        </div>
+        <div class="channel-item" data-channel-id="photos">
+          <span class="channel-hash">#</span>
+          <span class="channel-name">photos-media</span>
+        </div>
+      </div>
+
       <div class="sidebar-header">
-        <span class="sidebar-title">Connected Devices</span>
+        <span class="sidebar-title">Direct Messages</span>
         <span class="peer-count-badge" id="peer-count-badge">0 Online</span>
       </div>
 
-      <!-- Peer Channels List -->
+      <!-- Peer Direct Channels List -->
       <div class="peer-list" id="peer-list">
-        <div class="peer-item active" id="peer-target-broadcast" data-peer-id="broadcast">
-          <div class="peer-avatar group">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-              <circle cx="9" cy="7" r="4"/>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
-          </div>
-          <div class="peer-meta">
-            <div class="peer-name">All Group</div>
-            <div class="peer-sub">Broadcast Channel</div>
-          </div>
-        </div>
       </div>
 
       <!-- Current User Profile Strip with Sleek Apple Battery Widget -->
@@ -321,13 +344,8 @@
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
           </button>
 
-          <button type="button" class="btn-tool" id="btn-open-sketch" title="Draw map / sketch" aria-label="Draw Sketch">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 19l7-7 3 3-7 7-3-3z"/>
-              <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
-              <path d="M2 2l7.586 7.586"/>
-              <circle cx="11" cy="11" r="2"/>
-            </svg>
+          <button type="button" class="btn-tool" id="btn-quick-templates" title="Quick Templates & Slash Commands" aria-label="Templates">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
           </button>
 
           <button type="button" class="btn-tool" id="btn-open-sketch" title="Draw map / sketch" aria-label="Draw Sketch">
@@ -1010,6 +1028,146 @@
       </div>
 
       <button class="btn btn-primary" style="width: 100%;" id="btn-save-wallpaper">Apply Wallpaper</button>
+    </div>
+  </div>
+
+  <!-- ⭐ Starred Messages & Media Vault Modal -->
+  <div class="modal-overlay" id="starred-modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">⭐ Starred Messages Vault</h3>
+          <p class="modal-subtitle">Your saved bookmarks, links & important media</p>
+        </div>
+        <button class="close-btn" id="starred-modal-close-btn">&times;</button>
+      </div>
+
+      <div class="starred-vault-list" id="starred-vault-list">
+        <div class="ptt-log-item empty">No starred messages yet. Tap ⭐ on any message to bookmark it!</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🗓️ Group Events & Calendar Scheduler Modal -->
+  <div class="modal-overlay" id="event-modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">🗓️ Schedule Group Event</h3>
+          <p class="modal-subtitle">Create meetup with live Going / Maybe / Decline RSVPs</p>
+        </div>
+        <button class="close-btn" id="event-modal-close-btn">&times;</button>
+      </div>
+
+      <div class="field-group" style="margin-bottom: 12px;">
+        <label class="ip-section-label" for="event-title-input">Event Title / Activity:</label>
+        <input type="text" class="text-input-field" id="event-title-input" placeholder="e.g. Weekend Board Game Night or Study Session">
+      </div>
+
+      <div class="field-group" style="margin-bottom: 12px;">
+        <label class="ip-section-label" for="event-datetime-input">Date & Time:</label>
+        <input type="text" class="text-input-field" id="event-datetime-input" placeholder="e.g. Tonight @ 7:30 PM (or Saturday 10:00 AM)">
+      </div>
+
+      <div class="field-group" style="margin-bottom: 16px;">
+        <label class="ip-section-label" for="event-location-input">Location / Details (Optional):</label>
+        <input type="text" class="text-input-field" id="event-location-input" placeholder="e.g. Library 2nd Floor / Central Park Cafe">
+      </div>
+
+      <button class="btn btn-primary" style="width: 100%;" id="btn-submit-create-event">Post Event to Group</button>
+    </div>
+  </div>
+
+  <!-- 🎮 Multiplayer In-Chat Mini-Games Hub Modal -->
+  <div class="modal-overlay" id="games-modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">🎮 Multiplayer Chat Games</h3>
+          <p class="modal-subtitle">Play live turn-based mini-games with teammates</p>
+        </div>
+        <button class="close-btn" id="games-modal-close-btn">&times;</button>
+      </div>
+
+      <div class="games-selection-grid">
+        <button class="game-choice-card" id="btn-start-tictactoe">
+          <span class="game-choice-icon">❌ ⭕</span>
+          <span class="game-choice-title">Tic-Tac-Toe</span>
+          <span class="game-choice-desc">Interactive 3x3 turn-based board directly in chat</span>
+        </button>
+
+        <button class="game-choice-card" id="btn-start-diceroll">
+          <span class="game-choice-icon">🎲 🎲</span>
+          <span class="game-choice-title">Roll 2x Dice</span>
+          <span class="game-choice-desc">Instant random 2d6 dice toss for board games</span>
+        </button>
+
+        <button class="game-choice-card" id="btn-start-rps">
+          <span class="game-choice-icon">✊ ✋ ✌️</span>
+          <span class="game-choice-title">Rock Paper Scissors</span>
+          <span class="game-choice-desc">Quick tie-breaker or decision game</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⚡ Quick Templates & Slash Commands Modal -->
+  <div class="modal-overlay" id="templates-modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">⚡ Quick Shortcuts & Templates</h3>
+          <p class="modal-subtitle">Tap any shortcut to send instantly</p>
+        </div>
+        <button class="close-btn" id="templates-modal-close-btn">&times;</button>
+      </div>
+
+      <div class="templates-list">
+        <button class="template-item-btn" data-text="📍 My ETA is about 10 minutes!">
+          <span class="tpl-cmd">/eta</span>
+          <span class="tpl-text">"My ETA is about 10 minutes!"</span>
+        </button>
+        <button class="template-item-btn" data-text="☕ Let's take a quick 10-minute break / coffee run.">
+          <span class="tpl-cmd">/break</span>
+          <span class="tpl-text">"Let's take a quick 10-minute break / coffee run."</span>
+        </button>
+        <button class="template-item-btn" data-text="🍕 Who's hungry? Ordering food soon, drop your orders!">
+          <span class="tpl-cmd">/food</span>
+          <span class="tpl-text">"Who's hungry? Ordering food soon..."</span>
+        </button>
+        <button class="template-item-btn" data-text="📞 Can you jump on a quick audio call?">
+          <span class="tpl-cmd">/call</span>
+          <span class="tpl-text">"Can you jump on a quick audio call?"</span>
+        </button>
+        <button class="template-item-btn" data-text="✅ Sounds good to me, let's proceed!">
+          <span class="tpl-cmd">/agree</span>
+          <span class="tpl-text">"Sounds good to me, let's proceed!"</span>
+        </button>
+        <button class="template-item-btn" data-text="¯\_(ツ)_/¯">
+          <span class="tpl-cmd">/shrug</span>
+          <span class="tpl-text">"¯\_(ツ)_/¯"</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 📁 Create Channel Modal -->
+  <div class="modal-overlay" id="channel-modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">📁 Create Topic Room</h3>
+          <p class="modal-subtitle">Create a dedicated sub-channel for the group</p>
+        </div>
+        <button class="close-btn" id="channel-modal-close-btn">&times;</button>
+      </div>
+
+      <div class="field-group" style="margin-bottom: 14px;">
+        <label class="ip-section-label" for="new-channel-name-input">Channel Name:</label>
+        <input type="text" class="text-input-field" id="new-channel-name-input" placeholder="e.g. project-talk, movie-night, memes">
+      </div>
+
+      <button class="btn btn-primary" style="width: 100%;" id="btn-submit-create-channel">Create Room</button>
     </div>
   </div>
 

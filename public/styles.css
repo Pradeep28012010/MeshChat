@@ -3106,5 +3106,339 @@ body.dark-theme .msg-text code { background: rgba(255, 255, 255, 0.15); }
   margin-left: 3px;
 }
 
+/* ==========================================================
+   📁 CHANNELS / TOPIC ROOMS
+   ========================================================== */
+.btn-add-channel-header {
+  background: var(--bg-surface-secondary);
+  border: 1px solid var(--border-divider);
+  color: var(--text-primary);
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--trans-fast);
+}
+
+.btn-add-channel-header:hover {
+  background: var(--accent-blue);
+  color: #ffffff;
+  border-color: var(--accent-blue);
+}
+
+.channels-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 10px 10px;
+}
+
+.channel-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--trans-fast);
+}
+
+.channel-item:hover {
+  background-color: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+.channel-item.active {
+  background-color: var(--accent-blue-tint);
+  color: var(--accent-blue);
+  font-weight: 600;
+}
+
+.channel-hash {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  opacity: 0.7;
+}
+
+/* ==========================================================
+   ⭐ STARRED MESSAGES VAULT
+   ========================================================== */
+.starred-vault-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 380px;
+  overflow-y: auto;
+}
+
+.starred-item-card {
+  background-color: var(--bg-app);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+}
+
+.starred-item-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-blue);
+  margin-bottom: 4px;
+}
+
+.starred-item-content {
+  font-size: 13px;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+/* ==========================================================
+   🗓️ GROUP EVENTS & RSVPS
+   ========================================================== */
+.event-card {
+  background-color: var(--bg-app);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin: 4px 0;
+  min-width: 240px;
+  max-width: 320px;
+}
+
+.event-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.event-meta-line {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.event-rsvp-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.btn-rsvp {
+  flex: 1;
+  padding: 5px 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-divider);
+  background: var(--bg-surface);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--trans-fast);
+}
+
+.btn-rsvp:hover {
+  border-color: var(--accent-blue);
+}
+
+.btn-rsvp.active-going {
+  background-color: #34c759;
+  color: #ffffff;
+  border-color: #34c759;
+}
+
+.btn-rsvp.active-maybe {
+  background-color: #ff9500;
+  color: #ffffff;
+  border-color: #ff9500;
+}
+
+.btn-rsvp.active-decline {
+  background-color: #ff3b30;
+  color: #ffffff;
+  border-color: #ff3b30;
+}
+
+.event-attendees {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-top: 8px;
+}
+
+/* ==========================================================
+   🎮 MULTIPLAYER IN-CHAT GAMES (TIC-TAC-TOE & DICE)
+   ========================================================== */
+.game-card {
+  background-color: var(--bg-app);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin: 4px 0;
+  min-width: 220px;
+  max-width: 280px;
+}
+
+.game-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tictactoe-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  width: 180px;
+  margin: 8px auto;
+}
+
+.ttt-cell {
+  width: 56px;
+  height: 56px;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-divider);
+  border-radius: var(--radius-sm);
+  font-size: 24px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color var(--trans-fast);
+}
+
+.ttt-cell:hover:not(.filled) {
+  background-color: var(--accent-blue-tint);
+}
+
+.ttt-cell.filled {
+  cursor: default;
+}
+
+.game-status-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--accent-blue);
+  margin-top: 6px;
+}
+
+.dice-display-box {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin: 10px 0;
+}
+
+.dice-die {
+  width: 46px;
+  height: 46px;
+  background-color: #ffffff;
+  color: #000000;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  font-weight: bold;
+}
+
+/* ==========================================================
+   ⚡ QUICK TEMPLATES & GAMES SELECTION
+   ========================================================== */
+.templates-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.template-item-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--bg-app);
+  border: 1px solid var(--border-divider);
+  border-radius: var(--radius-md);
+  text-align: left;
+  cursor: pointer;
+  transition: all var(--trans-fast);
+}
+
+.template-item-btn:hover {
+  border-color: var(--accent-blue);
+  background: var(--bg-surface-hover);
+}
+
+.tpl-cmd {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--accent-blue);
+  font-size: 12px;
+}
+
+.tpl-text {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.games-selection-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.game-choice-card {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px;
+  background: var(--bg-app);
+  border: 1px solid var(--border-divider);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--trans-fast);
+}
+
+.game-choice-card:hover {
+  border-color: var(--accent-blue);
+  transform: translateY(-1px);
+}
+
+.game-choice-icon {
+  font-size: 20px;
+  margin-bottom: 4px;
+}
+
+.game-choice-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.game-choice-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+
 
 

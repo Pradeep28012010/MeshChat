@@ -305,6 +305,39 @@ wss.on('connection', (ws, req) => {
           break;
         }
 
+        // Shared Group Events & RSVPs
+        case 'EVENT_RSVP': {
+          broadcast({
+            type: 'EVENT_RSVP',
+            eventId: data.eventId,
+            status: data.status, // 'going', 'maybe', 'decline'
+            voterId: currentPeerId,
+            voterName: data.voterName || 'User'
+          });
+          break;
+        }
+
+        // Multiplayer In-Chat Mini Games
+        case 'GAME_MOVE': {
+          broadcast({
+            type: 'GAME_MOVE',
+            gameId: data.gameId,
+            moveData: data.moveData,
+            senderId: currentPeerId,
+            senderName: data.senderName || 'Player'
+          });
+          break;
+        }
+
+        // Custom Sub-Channels Creation
+        case 'CHANNEL_CREATE': {
+          broadcast({
+            type: 'CHANNEL_CREATE',
+            channel: data.channel
+          });
+          break;
+        }
+
         // Live Push-To-Talk (PTT) Audio Blast
         case 'PTT_AUDIO': {
           broadcast({
