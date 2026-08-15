@@ -552,6 +552,12 @@
     viewPaneMap: document.getElementById('view-pane-map'),
     viewPanePtt: document.getElementById('view-pane-ptt'),
 
+    // Tools Hub
+    btnOpenToolsHub: document.getElementById('btn-open-tools-hub'),
+    btnSidebarToolsHub: document.getElementById('btn-sidebar-tools-hub'),
+    toolsHubModalOverlay: document.getElementById('tools-hub-modal-overlay'),
+    toolsHubCloseBtn: document.getElementById('tools-hub-close-btn'),
+
     // Timer Modal
     btnOpenTimer: document.getElementById('btn-open-timer'),
     timerModalOverlay: document.getElementById('timer-modal-overlay'),
@@ -4625,6 +4631,57 @@
     // Sidebar Backdrop & Drawer Controls
     if (elements.sidebarBackdrop) elements.sidebarBackdrop.addEventListener('click', closeSidebarDrawer);
     if (elements.btnCloseSidebar) elements.btnCloseSidebar.addEventListener('click', closeSidebarDrawer);
+
+    // 🧰 Central Tools & Apps Hub Triggers
+    const openToolsHub = () => {
+      elements.toolsHubModalOverlay.classList.add('active');
+    };
+    const closeToolsHub = () => {
+      elements.toolsHubModalOverlay.classList.remove('active');
+    };
+
+    if (elements.btnOpenToolsHub) elements.btnOpenToolsHub.addEventListener('click', openToolsHub);
+    if (elements.btnSidebarToolsHub) elements.btnSidebarToolsHub.addEventListener('click', openToolsHub);
+    if (elements.toolsHubCloseBtn) elements.toolsHubCloseBtn.addEventListener('click', closeToolsHub);
+
+    const bindHubCard = (cardId, actionFn) => {
+      const card = document.getElementById(cardId);
+      if (card) {
+        card.addEventListener('click', () => {
+          closeToolsHub();
+          actionFn();
+        });
+      }
+    };
+
+    bindHubCard('hub-card-notes', openNotesModal);
+    bindHubCard('hub-card-timer', openTimerModal);
+    bindHubCard('hub-card-expenses', openExpensesModal);
+    bindHubCard('hub-card-events', () => {
+      elements.eventTitleInput.value = '';
+      elements.eventDatetimeInput.value = '';
+      elements.eventLocationInput.value = '';
+      elements.eventModalOverlay.classList.add('active');
+    });
+    bindHubCard('hub-card-starred', openStarredVaultModal);
+    bindHubCard('hub-card-games', () => elements.gamesModalOverlay.classList.add('active'));
+    bindHubCard('hub-card-rollcall', startRollCall);
+    bindHubCard('hub-card-geofence', () => {
+      elements.geofenceSlider.value = state.geofence.radiusMeters;
+      elements.geofenceRadiusLabel.textContent = `${state.geofence.radiusMeters} meters`;
+      elements.geofenceActiveToggle.checked = state.geofence.enabled;
+      elements.geofenceModalOverlay.classList.add('active');
+    });
+    bindHubCard('hub-card-morse', () => elements.morseModalOverlay.classList.add('active'));
+    bindHubCard('hub-card-radar', initTacticalRadar);
+    bindHubCard('hub-card-ai', () => elements.aiModalOverlay.classList.add('active'));
+    bindHubCard('hub-card-guide', () => elements.guideModalOverlay.classList.add('active'));
+    bindHubCard('hub-card-camera', openCameraModal);
+    bindHubCard('hub-card-network', openNetworkHud);
+    bindHubCard('hub-card-red-mode', toggleRedVisionMode);
+    bindHubCard('hub-card-encryption', openEncryptionModal);
+    bindHubCard('hub-card-wallpaper', openWallpaperModal);
+    bindHubCard('hub-card-disappearing', openDisappearingModal);
 
     // Synchronized Timer
     if (elements.btnOpenTimer) elements.btnOpenTimer.addEventListener('click', openTimerModal);
