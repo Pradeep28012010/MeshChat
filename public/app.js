@@ -615,7 +615,11 @@
     // 3D Dice & RPS Showdown & Context Menu
     diceModalOverlay: document.getElementById('dice-modal-overlay'),
     diceModalCloseBtn: document.getElementById('dice-modal-close-btn'),
-    dice3dCube: document.getElementById('dice-3d-cube'),
+    diceCube1: document.getElementById('dice-3d-cube-1'),
+    diceCube2: document.getElementById('dice-3d-cube-2'),
+    diceWrap2: document.getElementById('dice-wrap-2'),
+    diceShadow1: document.getElementById('dice-shadow-1'),
+    diceShadow2: document.getElementById('dice-shadow-2'),
     diceResultText: document.getElementById('dice-result-text'),
     btnRoll3dDice: document.getElementById('btn-roll-3d-dice'),
     btnShareDiceResult: document.getElementById('btn-share-dice-result'),
@@ -632,6 +636,35 @@
     contactReqName: document.getElementById('contact-req-name'),
     btnAcceptContactReq: document.getElementById('btn-accept-contact-req'),
     btnDeclineContactReq: document.getElementById('btn-decline-contact-req'),
+
+    // Topic Rooms & Security Management
+    btnManageRoom: document.getElementById('btn-manage-room'),
+    roomMembersCountBadge: document.getElementById('room-members-count-badge'),
+    roomSettingsModalOverlay: document.getElementById('room-settings-modal-overlay'),
+    roomSettingsCloseBtn: document.getElementById('room-settings-close-btn'),
+    roomSettingsTitle: document.getElementById('room-settings-title'),
+    roomInfoPrivacyBadge: document.getElementById('room-info-privacy-badge'),
+    roomInfoOwnerBadge: document.getElementById('room-info-owner-badge'),
+    roomInfoTopic: document.getElementById('room-info-topic'),
+    roomAdminSection: document.getElementById('room-admin-section'),
+    roomInvitePeerSelect: document.getElementById('room-invite-peer-select'),
+    btnSendRoomInvite: document.getElementById('btn-send-room-invite'),
+    roomMembersList: document.getElementById('room-members-list'),
+    roomMembersListLabel: document.getElementById('room-members-list-label'),
+    btnLeaveRoom: document.getElementById('btn-leave-room'),
+    btnDeleteRoomAdmin: document.getElementById('btn-delete-room-admin'),
+
+    roomInviteToast: document.getElementById('room-invite-toast'),
+    roomInviteName: document.getElementById('room-invite-name'),
+    roomInviteDesc: document.getElementById('room-invite-desc'),
+    btnAcceptRoomInvite: document.getElementById('btn-accept-room-invite'),
+    btnDeclineRoomInvite: document.getElementById('btn-decline-room-invite'),
+
+    newChannelTopicInput: document.getElementById('new-channel-topic-input'),
+    optPrivacyPublic: document.getElementById('opt-privacy-public'),
+    optPrivacyPrivate: document.getElementById('opt-privacy-private'),
+    privateRoomPasscodeGroup: document.getElementById('private-room-passcode-group'),
+    newChannelPasscodeInput: document.getElementById('new-channel-passcode-input'),
 
     appContextMenu: document.getElementById('app-context-menu'),
 
@@ -1400,20 +1433,33 @@
     }
   }
 
+  function canAccessChannel(ch) {
+    if (!ch) return false;
+    if (ch.id === 'general') return true;
+    if (!ch.isPrivate) return true;
+    if (ch.creatorId === state.self.id) return true;
+    if (ch.members && Array.isArray(ch.members) && ch.members.includes(state.self.id)) return true;
+    return false;
+  }
+
   function renderChannelsList() {
     if (!elements.channelsList) return;
     elements.channelsList.innerHTML = '';
     state.channels.forEach(ch => {
+      if (!canAccessChannel(ch)) return;
+
       const isAct = state.activeTargetId === 'broadcast' && state.activeChannelId === ch.id;
+      const isCreator = ch.creatorId === state.self.id;
       const div = document.createElement('div');
       div.className = `channel-item ${isAct ? 'active' : ''}`;
       div.dataset.channelId = ch.id;
       div.innerHTML = `
         <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
-          <span class="channel-hash">#</span>
+          <span class="channel-hash">${ch.isPrivate ? '🔒' : '#'}</span>
           <span class="channel-name">${escapeHtml(ch.name)}</span>
+          ${isCreator ? '<span style="font-size:10px;" title="Room Owner">👑</span>' : ''}
         </div>
-        ${ch.id !== 'general' ? `<button class="btn-delete-channel" data-channel-id="${escapeHtml(ch.id)}" title="Delete Channel">✕</button>` : ''}
+        ${ch.id !== 'general' && isCreator ? `<button class="btn-delete-channel" data-channel-id="${escapeHtml(ch.id)}" title="Delete Room">✕</button>` : ''}
       `;
       div.onclick = (e) => {
         if (e.target.classList.contains('btn-delete-channel')) {
@@ -1431,7 +1477,7 @@
     if (chId === 'general') return;
     const ch = state.channels.find(c => c.id === chId);
     const chName = ch ? ch.name : chId;
-    if (!confirm(`Are you sure you want to delete room #${chName} and all its messages?`)) return;
+    if (!confirm(`Are you sure you want to delete room #${chName} and all its messages for everyone?`)) return;
 
     state.channels = state.channels.filter(c => c.id !== chId);
     saveChannelsToStorage();
@@ -1442,6 +1488,8 @@
     } else {
       renderChannelsList();
     }
+
+    if (elements.roomSettingsModalOverlay) elements.roomSettingsModalOverlay.classList.remove('active');
 
     if (state.ws && state.ws.readyState === WebSocket.OPEN) {
       state.ws.send(JSON.stringify({ type: 'CHANNEL_DELETE', channelId: chId }));
@@ -1457,10 +1505,11 @@
     renderPeerList(Array.from(state.peers.values()));
 
     const ch = state.channels.find(c => c.id === channelId);
-    const chName = ch ? `#${ch.name}` : '#general';
+    const chName = ch ? `${ch.isPrivate ? '🔒 ' : '#'}${ch.name}` : '#general';
+    const memberCount = (ch && ch.members) ? ch.members.length : (state.peers.size + 1);
 
     elements.activeChatTitle.textContent = chName;
-    elements.activeChatStatus.textContent = `Topic Room • Encrypted Local Mesh`;
+    elements.activeChatStatus.textContent = ch ? (ch.topic || (ch.isPrivate ? 'Private Room • Invite Only' : 'Public Room • Local Mesh')) : 'Public Topic Room';
     elements.activeChatAvatar.className = 'peer-avatar group';
     elements.activeChatAvatar.innerHTML = `
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1473,6 +1522,17 @@
     elements.btnAudioCall.style.display = 'none';
     elements.btnVideoCall.style.display = 'none';
 
+    if (elements.btnManageRoom) {
+      if (channelId !== 'general' && ch) {
+        elements.btnManageRoom.style.display = 'inline-flex';
+        if (elements.roomMembersCountBadge) {
+          elements.roomMembersCountBadge.textContent = `${memberCount} Member${memberCount !== 1 ? 's' : ''}`;
+        }
+      } else {
+        elements.btnManageRoom.style.display = 'none';
+      }
+    }
+
     renderMessagesForActiveTarget();
     closeSidebarDrawer();
   }
@@ -1483,11 +1543,26 @@
 
     const id = name;
     if (state.channels.find(c => c.id === id)) {
-      alert('Channel already exists.');
+      alert('A room with this name already exists.');
       return;
     }
 
-    const ch = { id, name };
+    const topic = elements.newChannelTopicInput ? elements.newChannelTopicInput.value.trim() : '';
+    const isPrivate = elements.optPrivacyPrivate && elements.optPrivacyPrivate.classList.contains('active');
+    const passcode = elements.newChannelPasscodeInput ? elements.newChannelPasscodeInput.value.trim() : '';
+
+    const ch = {
+      id,
+      name,
+      topic,
+      isPrivate,
+      passcode,
+      creatorId: state.self.id,
+      creatorName: state.self.name,
+      members: [state.self.id],
+      createdAt: Date.now()
+    };
+
     state.channels.push(ch);
     localStorage.setItem('mesh_channels', JSON.stringify(state.channels));
 
@@ -1501,6 +1576,163 @@
         channel: ch
       }));
     }
+  }
+
+  function openRoomSettingsModal() {
+    const ch = state.channels.find(c => c.id === state.activeChannelId);
+    if (!ch) return;
+
+    const isCreator = ch.creatorId === state.self.id;
+    if (elements.roomSettingsTitle) elements.roomSettingsTitle.textContent = `⚙️ #${ch.name} Settings`;
+    if (elements.roomInfoPrivacyBadge) elements.roomInfoPrivacyBadge.textContent = ch.isPrivate ? '🔒 Private Room' : '🌐 Public Room';
+    if (elements.roomInfoOwnerBadge) elements.roomInfoOwnerBadge.textContent = `👑 Owner: ${isCreator ? 'You' : (ch.creatorName || 'Admin')}`;
+    if (elements.roomInfoTopic) elements.roomInfoTopic.textContent = ch.topic || 'No topic description set.';
+
+    if (elements.roomAdminSection) {
+      elements.roomAdminSection.style.display = isCreator ? 'block' : 'none';
+      if (elements.roomInvitePeerSelect) {
+        elements.roomInvitePeerSelect.innerHTML = '<option value="">Select a connected contact...</option>';
+        state.peers.forEach(peer => {
+          if (peer.id !== state.self.id && (!ch.members || !ch.members.includes(peer.id))) {
+            const opt = document.createElement('option');
+            opt.value = peer.id;
+            opt.textContent = `${peer.name} (${peer.id.slice(0, 8)})`;
+            elements.roomInvitePeerSelect.appendChild(opt);
+          }
+        });
+      }
+    }
+
+    if (elements.btnDeleteRoomAdmin) elements.btnDeleteRoomAdmin.style.display = isCreator ? 'inline-flex' : 'none';
+    if (elements.btnLeaveRoom) elements.btnLeaveRoom.style.display = !isCreator ? 'inline-flex' : 'none';
+
+    // Render Members List
+    if (elements.roomMembersList) {
+      elements.roomMembersList.innerHTML = '';
+      const members = ch.members || [ch.creatorId];
+      if (elements.roomMembersListLabel) elements.roomMembersListLabel.textContent = `👥 Room Members (${members.length}):`;
+
+      members.forEach(memId => {
+        const isMemCreator = memId === ch.creatorId;
+        const peer = state.peers.get(memId);
+        const name = memId === state.self.id ? `You (${state.self.name})` : (peer ? peer.name : `Peer (${memId.slice(0, 6)})`);
+
+        const card = document.createElement('div');
+        card.className = 'room-member-card';
+        card.innerHTML = `
+          <div class="room-member-meta">
+            <span style="font-size: 16px;">${isMemCreator ? '👑' : '👤'}</span>
+            <span class="room-member-name">${escapeHtml(name)}</span>
+            <span class="room-member-role-tag">${isMemCreator ? 'Admin' : 'Member'}</span>
+          </div>
+          ${isCreator && !isMemCreator ? `<button type="button" class="btn-kick-member" data-mem-id="${memId}">Kick</button>` : ''}
+        `;
+
+        const kickBtn = card.querySelector('.btn-kick-member');
+        if (kickBtn) {
+          kickBtn.addEventListener('click', () => {
+            kickMemberFromRoom(ch.id, memId, name);
+          });
+        }
+        elements.roomMembersList.appendChild(card);
+      });
+    }
+
+    elements.roomSettingsModalOverlay.classList.add('active');
+  }
+
+  function invitePeerToRoom() {
+    const ch = state.channels.find(c => c.id === state.activeChannelId);
+    const peerId = elements.roomInvitePeerSelect ? elements.roomInvitePeerSelect.value : null;
+    if (!ch || !peerId) return;
+
+    if (!ch.members) ch.members = [ch.creatorId];
+    if (!ch.members.includes(peerId)) {
+      ch.members.push(peerId);
+      localStorage.setItem('mesh_channels', JSON.stringify(state.channels));
+    }
+
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+      state.ws.send(JSON.stringify({
+        type: 'ROOM_INVITE',
+        channelId: ch.id,
+        targetPeerId: peerId
+      }));
+    }
+
+    openRoomSettingsModal();
+    alert(`Invitation sent to ${state.peers.get(peerId)?.name || 'Peer'}!`);
+  }
+
+  function kickMemberFromRoom(channelId, memberId, memberName) {
+    if (!confirm(`Are you sure you want to remove ${memberName} from this room?`)) return;
+    const ch = state.channels.find(c => c.id === channelId);
+    if (!ch || !ch.members) return;
+
+    ch.members = ch.members.filter(m => m !== memberId);
+    localStorage.setItem('mesh_channels', JSON.stringify(state.channels));
+
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+      state.ws.send(JSON.stringify({
+        type: 'ROOM_MEMBER_KICK',
+        channelId: channelId,
+        targetMemberId: memberId,
+        adminId: state.self.id
+      }));
+    }
+    openRoomSettingsModal();
+  }
+
+  function leaveCurrentRoom() {
+    const ch = state.channels.find(c => c.id === state.activeChannelId);
+    if (!ch) return;
+    if (!confirm(`Are you sure you want to leave #${ch.name}?`)) return;
+
+    if (ch.members) ch.members = ch.members.filter(m => m !== state.self.id);
+    localStorage.setItem('mesh_channels', JSON.stringify(state.channels));
+
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+      state.ws.send(JSON.stringify({
+        type: 'ROOM_LEAVE',
+        channelId: ch.id
+      }));
+    }
+
+    elements.roomSettingsModalOverlay.classList.remove('active');
+    selectChannel('general');
+  }
+
+  let activeIncomingRoomInvite = null;
+  function handleIncomingRoomInvite(data) {
+    if (!data.channel) return;
+    activeIncomingRoomInvite = data.channel;
+
+    if (elements.roomInviteToast) {
+      if (elements.roomInviteName) elements.roomInviteName.textContent = `Invite to #${data.channel.name}`;
+      if (elements.roomInviteDesc) elements.roomInviteDesc.textContent = `${data.inviterName || 'Admin'} invited you to join this private room`;
+      elements.roomInviteToast.style.display = 'flex';
+    }
+  }
+
+  function acceptRoomInvite() {
+    if (!activeIncomingRoomInvite) return;
+    const ch = activeIncomingRoomInvite;
+    if (!state.channels.find(c => c.id === ch.id)) {
+      state.channels.push(ch);
+    } else {
+      const existing = state.channels.find(c => c.id === ch.id);
+      Object.assign(existing, ch);
+    }
+    localStorage.setItem('mesh_channels', JSON.stringify(state.channels));
+    if (elements.roomInviteToast) elements.roomInviteToast.style.display = 'none';
+
+    renderChannelsList();
+    selectChannel(ch.id);
+  }
+
+  function declineRoomInvite() {
+    if (elements.roomInviteToast) elements.roomInviteToast.style.display = 'none';
+    activeIncomingRoomInvite = null;
   }
 
   function handleIncomingChannelCreate(data) {
@@ -1693,59 +1925,143 @@
     5: 'rotateX(-90deg) rotateY(0deg)',
     6: 'rotateX(90deg) rotateY(0deg)'
   };
+    let diceMode = 1;
+    let currentDiceResults = { d1: 6, d2: 5, total: 11 };
 
-  function init3dDiceRoller() {
-    if (elements.btnRoll3dDice) {
-      elements.btnRoll3dDice.addEventListener('click', roll3dDice);
+    function playDiceAudioSynthesizer() {
+      try {
+        const ctx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        if (ctx.state === 'suspended') ctx.resume();
+
+        for (let i = 0; i < 7; i++) {
+          setTimeout(() => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(260 + Math.random() * 280, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(70, ctx.currentTime + 0.045);
+            gain.gain.setValueAtTime(0.25, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.045);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.05);
+          }, i * 70);
+        }
+      } catch (e) {}
     }
-    if (elements.btnShareDiceResult) {
-      elements.btnShareDiceResult.addEventListener('click', shareDiceResultToChat);
+
+    function playDiceLandingChime() {
+      try {
+        const ctx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        if (ctx.state === 'suspended') ctx.resume();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
+        osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.08); // G5
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.35);
+      } catch (e) {}
     }
-    if (elements.btnStartDiceroll) {
-      elements.btnStartDiceroll.addEventListener('click', () => {
-        elements.gamesModalOverlay.classList.remove('active');
-        elements.diceModalOverlay.classList.add('active');
+
+    function init3dDiceRoller() {
+      if (elements.btnRoll3dDice) {
+        elements.btnRoll3dDice.addEventListener('click', roll3dDice);
+      }
+      if (elements.btnShareDiceResult) {
+        elements.btnShareDiceResult.addEventListener('click', shareDiceResultToChat);
+      }
+      if (elements.btnStartDiceroll) {
+        elements.btnStartDiceroll.addEventListener('click', () => {
+          elements.gamesModalOverlay.classList.remove('active');
+          elements.diceModalOverlay.classList.add('active');
+        });
+      }
+      if (elements.diceModalCloseBtn) {
+        elements.diceModalCloseBtn.addEventListener('click', () => {
+          elements.diceModalOverlay.classList.remove('active');
+        });
+      }
+
+      document.querySelectorAll('.dice-mode-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.dice-mode-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          const m = btn.dataset.mode;
+          diceMode = m === '2' ? 2 : (m === 'duel' ? 'duel' : 1);
+          if (elements.diceWrap2) {
+            elements.diceWrap2.style.display = (diceMode === 2 || diceMode === 'duel') ? 'flex' : 'none';
+          }
+        });
       });
     }
-    if (elements.diceModalCloseBtn) {
-      elements.diceModalCloseBtn.addEventListener('click', () => {
-        elements.diceModalOverlay.classList.remove('active');
-      });
+
+    function roll3dDice() {
+      if (!elements.diceCube1) return;
+      elements.diceCube1.classList.add('rolling');
+      if (elements.diceCube2) elements.diceCube2.classList.add('rolling');
+
+      elements.diceResultText.textContent = 'Tumbling 3D Physics Dice across table... 🎲';
+      playDiceAudioSynthesizer();
+      if ('vibrate' in navigator) navigator.vibrate([35, 40, 45, 40]);
+
+      setTimeout(() => {
+        elements.diceCube1.classList.remove('rolling');
+        if (elements.diceCube2) elements.diceCube2.classList.remove('rolling');
+
+        const d1 = Math.floor(Math.random() * 6) + 1;
+        const d2 = Math.floor(Math.random() * 6) + 1;
+        const isDual = (diceMode === 2 || diceMode === 'duel');
+        const total = isDual ? (d1 + d2) : d1;
+
+        currentDiceResults = { d1, d2, total };
+
+        const rot1 = DICE_ROTATIONS[d1];
+        const rot2 = DICE_ROTATIONS[d2];
+
+        elements.diceCube1.style.transform = `${rot1} rotateZ(${Math.floor(Math.random() * 4) * 90}deg)`;
+        if (elements.diceCube2) {
+          elements.diceCube2.style.transform = `${rot2} rotateZ(${Math.floor(Math.random() * 4) * 90}deg)`;
+        }
+
+        playDiceLandingChime();
+        if ('vibrate' in navigator) navigator.vibrate(100);
+
+        let text = '';
+        if (isDual) {
+          text = `🎉 Rolled: Die 1 (${d1}) + Die 2 (${d2}) = Total: ${total}!`;
+          if (d1 === 6 && d2 === 6) text += ' 🔥 DOUBLE SIXES!';
+          else if (total === 7) text += ' ✨ LUCKY 7!';
+        } else {
+          text = `🎉 You Rolled: ${d1}!`;
+        }
+        elements.diceResultText.textContent = text;
+      }, 850);
     }
-  }
 
-  function roll3dDice() {
-    if (!elements.dice3dCube) return;
-    elements.dice3dCube.classList.add('rolling');
-    elements.diceResultText.textContent = 'Rolling 3D Dice... 🎲';
-    playSound('game_move');
-    if ('vibrate' in navigator) navigator.vibrate([40, 30, 40]);
-
-    setTimeout(() => {
-      elements.dice3dCube.classList.remove('rolling');
-      const rolled = Math.floor(Math.random() * 6) + 1;
-      currentDiceOutcome = rolled;
-      const rot = DICE_ROTATIONS[rolled];
-      elements.dice3dCube.style.transform = `${rot} rotateZ(${Math.floor(Math.random() * 4) * 90}deg)`;
-      elements.diceResultText.textContent = `🎉 You Rolled: ${rolled}!`;
-      playSound('message_received');
-      if ('vibrate' in navigator) navigator.vibrate(100);
-    }, 700);
-  }
-
-  async function shareDiceResultToChat() {
-    elements.diceModalOverlay.classList.remove('active');
-    const msg = {
-      id: 'game_dice_' + Date.now(),
-      senderId: state.self.id,
-      senderName: state.self.name,
-      targetId: state.activeTargetId,
-      channelId: state.activeTargetId === 'broadcast' ? state.activeChannelId : null,
-      text: `🎲 **Dice Roll Duel:** ${state.self.name} threw a **${currentDiceOutcome}**! Can you beat it?`,
-      timestamp: Date.now()
-    };
-    await dispatchMessage(msg);
-  }
+    async function shareDiceResultToChat() {
+      elements.diceModalOverlay.classList.remove('active');
+      const isDual = (diceMode === 2 || diceMode === 'duel');
+      const msg = {
+        id: 'game_dice_' + Date.now(),
+        type: 'game_dice_challenge',
+        senderId: state.self.id,
+        senderName: state.self.name,
+        targetId: state.activeTargetId,
+        channelId: state.activeTargetId === 'broadcast' ? state.activeChannelId : null,
+        scoreToBeat: currentDiceResults.total,
+        d1: currentDiceResults.d1,
+        d2: isDual ? currentDiceResults.d2 : null,
+        text: `🎲 **Dice Duel Challenge:** ${state.self.name} threw a score of **${currentDiceResults.total}**! Can anyone beat it?`,
+        timestamp: Date.now()
+      };
+      await dispatchMessage(msg);
+    }
 
   // ⚔️ 2-Player Rock Paper Scissors Showdown
   function initRpsShowdown() {
@@ -1832,19 +2148,21 @@
         const msgRow = e.target.closest('.msg-row');
         if (!msgRow) return;
         e.preventDefault();
-        openContextMenuForMessage(msgRow.dataset.msgId, e.clientX, e.clientY);
+        const msgId = msgRow.dataset.msgId || (msgRow.id && msgRow.id.replace('msg-row-', ''));
+        openContextMenuForMessage(msgId, e.clientX, e.clientY);
       });
 
-      // Mobile Long-Press Support (500ms touch timer)
+      // Mobile Long-Press Support (450ms touch timer)
       let touchTimer = null;
       elements.messagesContainer.addEventListener('touchstart', (e) => {
         const msgRow = e.target.closest('.msg-row');
         if (!msgRow) return;
         const touch = e.touches[0];
+        const msgId = msgRow.dataset.msgId || (msgRow.id && msgRow.id.replace('msg-row-', ''));
         touchTimer = setTimeout(() => {
-          openContextMenuForMessage(msgRow.dataset.msgId, touch.clientX, touch.clientY);
+          openContextMenuForMessage(msgId, touch.clientX, touch.clientY);
           if ('vibrate' in navigator) navigator.vibrate(50);
-        }, 500);
+        }, 450);
       }, { passive: true });
 
       elements.messagesContainer.addEventListener('touchend', () => {
@@ -1950,6 +2268,7 @@
   }
 
   function openContextMenuForMessage(msgId, x, y) {
+    if (!msgId) return;
     const msg = state.messages.find(m => m.id === msgId);
     if (!msg) return;
     activeContextMessageId = msgId;
@@ -1966,15 +2285,16 @@
     if (starLabel) starLabel.textContent = isStarred ? 'Unstar Message' : 'Star Message';
 
     const menu = elements.appContextMenu;
+    if (!menu) return;
     menu.style.display = 'block';
 
-    const menuWidth = 210;
-    const menuHeight = 260;
-    const posX = Math.min(x, window.innerWidth - menuWidth - 12);
-    const posY = Math.min(y, window.innerHeight - menuHeight - 12);
+    const menuWidth = 220;
+    const menuHeight = 270;
+    const posX = Math.min(x, window.innerWidth - menuWidth - 14);
+    const posY = Math.min(y, window.innerHeight - menuHeight - 14);
 
-    menu.style.left = `${Math.max(12, posX)}px`;
-    menu.style.top = `${Math.max(12, posY)}px`;
+    menu.style.left = `${Math.max(14, posX)}px`;
+    menu.style.top = `${Math.max(14, posY)}px`;
   }
 
   function handleTttCellClick(gameId, cellIndex) {
@@ -2422,6 +2742,7 @@
     if (!msg || !msg.options || !msg.options[optionIndex]) return;
 
     msg.options.forEach((opt, idx) => {
+      if (!opt.voters) opt.voters = [];
       const userIdx = opt.voters.indexOf(state.self.id);
       if (idx === optionIndex) {
         if (userIdx === -1) opt.voters.push(state.self.id);
@@ -2441,6 +2762,7 @@
         type: 'POLL_VOTE',
         pollId: pollId,
         optionIndex: optionIndex,
+        voterId: state.self.id,
         voterName: state.self.name
       }));
     }
@@ -2449,11 +2771,13 @@
   function handleIncomingPollVote(data) {
     const msg = state.messages.find(m => m.id === data.pollId);
     if (!msg || !msg.options || !msg.options[data.optionIndex]) return;
+    const voter = data.voterId || data.voterName;
 
     msg.options.forEach((opt, idx) => {
-      const userIdx = opt.voters.indexOf(data.voterId);
+      if (!opt.voters) opt.voters = [];
+      const userIdx = opt.voters.indexOf(voter);
       if (idx === data.optionIndex) {
-        if (userIdx === -1) opt.voters.push(data.voterId);
+        if (userIdx === -1) opt.voters.push(voter);
         else opt.voters.splice(userIdx, 1);
       } else {
         if (userIdx !== -1) opt.voters.splice(userIdx, 1);
@@ -3557,6 +3881,33 @@
         handleIncomingChannelDelete(data);
         break;
 
+      case 'ROOM_INVITE':
+        handleIncomingRoomInvite(data);
+        break;
+
+      case 'ROOM_KICKED':
+        alert(`You have been removed from room #${data.channelName || 'room'} by the room admin.`);
+        if (state.activeChannelId === data.channelId) {
+          selectChannel('general');
+        }
+        state.channels = state.channels.filter(c => c.id !== data.channelId);
+        localStorage.setItem('mesh_channels', JSON.stringify(state.channels));
+        renderChannelsList();
+        break;
+
+      case 'CHANNEL_UPDATE':
+        if (data.channel) {
+          const idx = state.channels.findIndex(c => c.id === data.channel.id);
+          if (idx !== -1) state.channels[idx] = data.channel;
+          else state.channels.push(data.channel);
+          localStorage.setItem('mesh_channels', JSON.stringify(state.channels));
+          renderChannelsList();
+          if (state.activeChannelId === data.channel.id && elements.roomSettingsModalOverlay && elements.roomSettingsModalOverlay.classList.contains('active')) {
+            openRoomSettingsModal();
+          }
+        }
+        break;
+
       case 'CLEAR_ROOM_HISTORY':
         handleIncomingClearRoomHistory(data);
         break;
@@ -4318,12 +4669,12 @@
   }
 
   function renderSingleMessageBubble(msg, isSelf) {
-    let existingRow = document.getElementById(`msg-row-${msg.id}`);
-    if (existingRow) existingRow.remove();
+    const existingRow = document.getElementById(`msg-row-${msg.id}`);
 
     const row = document.createElement('div');
     row.className = `msg-row ${isSelf ? 'self' : 'peer'}`;
     row.id = `msg-row-${msg.id}`;
+    row.dataset.msgId = msg.id;
 
     const timeStr = formatTime(msg.timestamp);
     let contentHtml = '';
@@ -4355,13 +4706,14 @@
       msg.options.forEach((opt, idx) => {
         const votes = opt.voters ? opt.voters.length : 0;
         const percent = totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0;
-        const hasVoted = opt.voters && opt.voters.includes(state.self.id);
+        const hasVoted = opt.voters && (opt.voters.includes(state.self.id) || opt.voters.includes(state.self.name));
 
         optionsHtml += `
           <div class="poll-opt-row ${hasVoted ? 'voted-by-me' : ''}" data-poll-id="${msg.id}" data-opt-idx="${idx}">
             <div class="poll-opt-progress-bar" style="width: ${percent}%;"></div>
             <div class="poll-opt-content">
-              <span>${hasVoted ? '✓ ' : ''}${escapeHtml(opt.text)}</span>
+              <span class="poll-opt-check">${hasVoted ? '✅' : '⚪'}</span>
+              <span class="poll-opt-label">${escapeHtml(opt.text)}</span>
             </div>
             <div class="poll-opt-percent">${votes} (${percent}%)</div>
           </div>
@@ -4432,7 +4784,19 @@
       `;
     }
 
-    // 5. 2x Dice Roll
+    // 5. Interactive 3D Dice Challenge Card
+    if (msg.type === 'game_dice_challenge') {
+      const isMyChallenge = msg.senderId === state.self.id;
+      contentHtml += `
+        <div class="dice-challenge-bubble-card" style="padding: 6px 2px;">
+          <div style="font-size: 13px; font-weight: 700; color: var(--accent-blue); margin-bottom: 4px;">🎲 3D Physics Dice Challenge</div>
+          <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px;">Target Score to Beat: <span style="font-size: 16px; color: #ff9500; font-weight: 800;">${msg.scoreToBeat}</span></div>
+          ${!isMyChallenge ? `<button type="button" class="btn btn-primary btn-sm btn-accept-dice-duel" data-target-score="${msg.scoreToBeat}" data-challenger="${escapeHtml(msg.senderName)}" style="width: 100%; font-weight: 700; padding: 8px;">⚔️ Roll 3D Dice to Beat ${msg.scoreToBeat}</button>` : '<div style="font-size: 11.5px; color: var(--text-secondary); font-style: italic;">Your challenge is live! Waiting for peer rolls...</div>'}
+        </div>
+      `;
+    }
+
+    // 6. 2x Dice Roll
     if (msg.type === 'diceroll') {
       contentHtml += `
         <div class="game-card">
@@ -4446,7 +4810,7 @@
       `;
     }
 
-    // 6. Location Message
+    // 7. Location Message
     if (msg.location) {
       let distStr = '';
       if (state.myCoords) {
@@ -4468,7 +4832,7 @@
       `;
     }
 
-    // 7. Audio Voice Memo with 1x / 1.5x / 2x Speed Controller & Scrubber
+    // 8. Audio Voice Memo with 1x / 1.5x / 2x Speed Controller & Scrubber
     if (msg.audioData) {
       contentHtml += `
         <div class="audio-msg-player" data-audio="${msg.audioData}" data-speed="1">
@@ -4484,7 +4848,7 @@
       `;
     }
 
-    // 8. File / Photo Attachment
+    // 9. File / Photo Attachment
     if (msg.fileData) {
       if (msg.fileType && msg.fileType.startsWith('image/')) {
         contentHtml += `<img src="${msg.fileData}" class="chat-image-preview" alt="Shared media" onclick="window.open('${msg.fileData}')">`;
@@ -4580,6 +4944,15 @@
       });
     });
 
+    row.querySelectorAll('.btn-accept-dice-duel').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetScore = parseInt(btn.dataset.targetScore, 10);
+        const challenger = btn.dataset.challenger;
+        elements.diceModalOverlay.classList.add('active');
+        elements.diceResultText.textContent = `⚔️ Duel vs ${challenger}! Roll higher than ${targetScore} to win!`;
+      });
+    });
+
     row.querySelectorAll('.btn-rsvp').forEach(rsvpBtn => {
       rsvpBtn.addEventListener('click', () => {
         handleRsvpOnEvent(rsvpBtn.dataset.eventId, rsvpBtn.dataset.status);
@@ -4613,7 +4986,11 @@
       });
     });
 
-    elements.messagesContainer.appendChild(row);
+    if (existingRow) {
+      existingRow.replaceWith(row);
+    } else {
+      elements.messagesContainer.appendChild(row);
+    }
   }
 
   function setupAudioPlayer(playerContainer) {
@@ -5620,10 +5997,17 @@
       });
     });
 
-    // Channels
+    // Channels & Topic Rooms Management
     if (elements.btnCreateChannel) {
       elements.btnCreateChannel.addEventListener('click', () => {
         elements.newChannelNameInput.value = '';
+        if (elements.newChannelTopicInput) elements.newChannelTopicInput.value = '';
+        if (elements.newChannelPasscodeInput) elements.newChannelPasscodeInput.value = '';
+        if (elements.optPrivacyPublic) {
+          elements.optPrivacyPublic.classList.add('active');
+          if (elements.optPrivacyPrivate) elements.optPrivacyPrivate.classList.remove('active');
+        }
+        if (elements.privateRoomPasscodeGroup) elements.privateRoomPasscodeGroup.style.display = 'none';
         elements.channelModalOverlay.classList.add('active');
       });
     }
@@ -5633,6 +6017,32 @@
     if (elements.btnSubmitCreateChannel) {
       elements.btnSubmitCreateChannel.addEventListener('click', createNewChannel);
     }
+
+    if (elements.optPrivacyPublic) {
+      elements.optPrivacyPublic.addEventListener('click', () => {
+        elements.optPrivacyPublic.classList.add('active');
+        elements.optPrivacyPrivate.classList.remove('active');
+        if (elements.privateRoomPasscodeGroup) elements.privateRoomPasscodeGroup.style.display = 'none';
+      });
+    }
+    if (elements.optPrivacyPrivate) {
+      elements.optPrivacyPrivate.addEventListener('click', () => {
+        elements.optPrivacyPrivate.classList.add('active');
+        elements.optPrivacyPublic.classList.remove('active');
+        if (elements.privateRoomPasscodeGroup) elements.privateRoomPasscodeGroup.style.display = 'block';
+      });
+    }
+
+    // Room Settings Modal Listeners
+    if (elements.btnManageRoom) elements.btnManageRoom.addEventListener('click', openRoomSettingsModal);
+    if (elements.roomSettingsCloseBtn) elements.roomSettingsCloseBtn.addEventListener('click', () => elements.roomSettingsModalOverlay.classList.remove('active'));
+    if (elements.btnSendRoomInvite) elements.btnSendRoomInvite.addEventListener('click', invitePeerToRoom);
+    if (elements.btnLeaveRoom) elements.btnLeaveRoom.addEventListener('click', leaveCurrentRoom);
+    if (elements.btnDeleteRoomAdmin) elements.btnDeleteRoomAdmin.addEventListener('click', () => deleteChannel(state.activeChannelId));
+
+    // Room Invite Toast
+    if (elements.btnAcceptRoomInvite) elements.btnAcceptRoomInvite.addEventListener('click', acceptRoomInvite);
+    if (elements.btnDeclineRoomInvite) elements.btnDeclineRoomInvite.addEventListener('click', declineRoomInvite);
 
     // Starred Vault
     if (elements.btnOpenStarred) elements.btnOpenStarred.addEventListener('click', openStarredVaultModal);

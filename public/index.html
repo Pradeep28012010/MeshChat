@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="description" content="Zero-Internet Offline Messaging, Calling, GPS Map, Walkie-Talkie & Survival Suite">
   <link rel="manifest" href="./manifest.json">
-  <link rel="stylesheet" href="./styles.css?v=3.4">
+  <link rel="stylesheet" href="./styles.css?v=3.5">
   <title>MeshChat — Online Cloud & Offline Mesh Suite</title>
 </head>
 <body>
@@ -227,6 +227,10 @@
         </div>
 
         <div class="chat-header-actions" id="chat-header-actions">
+          <button class="btn-manage-room-header" id="btn-manage-room" title="Manage Room Members & Settings" style="display: none;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <span id="room-members-count-badge">Room Settings</span>
+          </button>
           <button class="btn-clear-chat-header" id="btn-clear-chat" title="Clear Chat History for this Room">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="3 6 5 6 21 6"></polyline>
@@ -236,7 +240,7 @@
           </button>
           <button class="btn-call-action" id="btn-audio-call" title="Start Audio Call" aria-label="Audio Call" style="display: none;">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
             </svg>
           </button>
           <button class="btn-call-action" id="btn-video-call" title="Start Video Call" aria-label="Video Call" style="display: none;">
@@ -1141,23 +1145,101 @@
     </div>
   </div>
 
-  <!-- 📁 Create Channel Modal -->
+  <!-- 📁 Create Secure Topic Room Modal -->
   <div class="modal-overlay" id="channel-modal-overlay">
-    <div class="modal-card">
+    <div class="modal-card" style="max-width: 460px;">
       <div class="modal-header">
         <div>
           <h3 class="modal-title">📁 Create Topic Room</h3>
-          <p class="modal-subtitle">Create a dedicated sub-channel for the group</p>
+          <p class="modal-subtitle">Dedicated sub-channel with full admin controls</p>
         </div>
         <button class="close-btn" id="channel-modal-close-btn">&times;</button>
       </div>
 
+      <div class="field-group" style="margin-bottom: 12px;">
+        <label class="ip-section-label" for="new-channel-name-input">Room Name:</label>
+        <input type="text" class="text-input-field" id="new-channel-name-input" placeholder="e.g. project-x, survival-team, gaming-squad">
+      </div>
+
+      <div class="field-group" style="margin-bottom: 12px;">
+        <label class="ip-section-label" for="new-channel-topic-input">Topic / Purpose (Optional):</label>
+        <input type="text" class="text-input-field" id="new-channel-topic-input" placeholder="e.g. Private planning for team leaders">
+      </div>
+
       <div class="field-group" style="margin-bottom: 14px;">
-        <label class="ip-section-label" for="new-channel-name-input">Channel Name:</label>
-        <input type="text" class="text-input-field" id="new-channel-name-input" placeholder="e.g. project-talk, movie-night, memes">
+        <label class="ip-section-label">Room Privacy Mode:</label>
+        <div class="room-privacy-selector">
+          <label class="room-privacy-opt active" id="opt-privacy-public">
+            <input type="radio" name="room-privacy" value="public" checked style="display:none;">
+            <span class="privacy-icon">🌐</span>
+            <div class="privacy-info">
+              <strong>Public Room</strong>
+              <p>Visible to all mesh peers. Anyone can join.</p>
+            </div>
+          </label>
+          <label class="room-privacy-opt" id="opt-privacy-private">
+            <input type="radio" name="room-privacy" value="private" style="display:none;">
+            <span class="privacy-icon">🔒</span>
+            <div class="privacy-info">
+              <strong>Private & Secure</strong>
+              <p>Hidden from other peers. Only invited members can enter.</p>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div class="field-group" id="private-room-passcode-group" style="margin-bottom: 14px; display: none;">
+        <label class="ip-section-label" for="new-channel-passcode-input">Optional Room Passcode / Secret Key:</label>
+        <input type="password" class="text-input-field" id="new-channel-passcode-input" placeholder="e.g. 1234 or SecretKey">
       </div>
 
       <button class="btn btn-primary" style="width: 100%;" id="btn-submit-create-channel">Create Room</button>
+    </div>
+  </div>
+
+  <!-- ⚙️ Topic Room Settings & Member Management Modal -->
+  <div class="modal-overlay" id="room-settings-modal-overlay">
+    <div class="modal-card" style="max-width: 480px;">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title" id="room-settings-title">⚙️ Room Settings & Members</h3>
+          <p class="modal-subtitle" id="room-settings-subtitle">Manage topic room members, access & security</p>
+        </div>
+        <button class="close-btn" id="room-settings-close-btn">&times;</button>
+      </div>
+
+      <div class="room-settings-info-card" id="room-settings-info-card">
+        <div class="room-info-badge-row">
+          <span class="room-privacy-badge" id="room-info-privacy-badge">🔒 Private Room</span>
+          <span class="room-owner-badge" id="room-info-owner-badge">👑 Created by: You</span>
+        </div>
+        <p class="room-topic-text" id="room-info-topic">No topic description set.</p>
+      </div>
+
+      <!-- Admin Actions Section (Only for Creator) -->
+      <div class="room-admin-section" id="room-admin-section" style="margin-bottom: 16px;">
+        <div class="ip-section-label">➕ Invite Peer to this Room:</div>
+        <div class="room-invite-row">
+          <select class="text-input-field" id="room-invite-peer-select" style="flex: 1;">
+            <option value="">Select a connected contact...</option>
+          </select>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-send-room-invite">Invite</button>
+        </div>
+      </div>
+
+      <!-- Members Whitelist List -->
+      <div class="room-members-container" style="margin-bottom: 16px;">
+        <div class="ip-section-label" id="room-members-list-label">👥 Room Members (1):</div>
+        <div class="room-members-list" id="room-members-list">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- Danger Controls -->
+      <div class="room-danger-actions" id="room-danger-actions">
+        <button type="button" class="btn btn-secondary btn-sm" id="btn-leave-room" style="color: #ff9500;">🚪 Leave Room</button>
+        <button type="button" class="btn btn-secondary btn-sm" id="btn-delete-room-admin" style="color: #ff3b30; display: none;">🗑️ Delete Room for Everyone</button>
+      </div>
     </div>
   </div>
 
@@ -1484,35 +1566,60 @@
     </div>
   </div>
 
-  <!-- 🎲 Realistic 3D Animated Dice Roller Modal -->
+  <!-- 🎲 Realistic 3D Physics Animated Dice Roller Modal -->
   <div class="modal-overlay" id="dice-modal-overlay">
-    <div class="modal-card" style="max-width: 420px; text-align: center;">
+    <div class="modal-card" style="max-width: 440px; text-align: center;">
       <div class="modal-header">
         <div>
           <h3 class="modal-title">🎲 3D Physics Dice Roller</h3>
-          <p class="modal-subtitle">Realistic 3D rolling animation & multiplayer duels</p>
+          <p class="modal-subtitle">Realistic 3D rolling physics, floor shadows & duels</p>
         </div>
         <button class="close-btn" id="dice-modal-close-btn">&times;</button>
       </div>
 
-      <div class="dice-3d-stage" id="dice-3d-stage">
-        <div class="dice-3d-cube" id="dice-3d-cube">
-          <div class="dice-face face-1"><span class="pip"></span></div>
-          <div class="dice-face face-2"><span class="pip"></span><span class="pip"></span></div>
-          <div class="dice-face face-3"><span class="pip"></span><span class="pip"></span><span class="pip"></span></div>
-          <div class="dice-face face-4"><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span></div>
-          <div class="dice-face face-5"><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span></div>
-          <div class="dice-face face-6"><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span></div>
+      <!-- Mode Selector -->
+      <div class="dice-mode-segmented">
+        <button type="button" class="dice-mode-btn active" data-mode="1">🎲 1 Die (1d6)</button>
+        <button type="button" class="dice-mode-btn" data-mode="2">🎲🎲 2 Dice (2d6)</button>
+        <button type="button" class="dice-mode-btn" data-mode="duel">⚔️ Duel Mode</button>
+      </div>
+
+      <!-- 3D Physics Stage -->
+      <div class="dice-3d-arena" id="dice-3d-arena">
+        <!-- Die 1 Wrap -->
+        <div class="dice-item-wrap">
+          <div class="dice-3d-cube" id="dice-3d-cube-1">
+            <div class="dice-face face-1"><span class="pip"></span></div>
+            <div class="dice-face face-2"><span class="pip"></span><span class="pip"></span></div>
+            <div class="dice-face face-3"><span class="pip"></span><span class="pip"></span><span class="pip"></span></div>
+            <div class="dice-face face-4"><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span></div>
+            <div class="dice-face face-5"><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span></div>
+            <div class="dice-face face-6"><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span></div>
+          </div>
+          <div class="dice-shadow-floor" id="dice-shadow-1"></div>
+        </div>
+
+        <!-- Die 2 Wrap -->
+        <div class="dice-item-wrap" id="dice-wrap-2" style="display: none;">
+          <div class="dice-3d-cube" id="dice-3d-cube-2">
+            <div class="dice-face face-1"><span class="pip"></span></div>
+            <div class="dice-face face-2"><span class="pip"></span><span class="pip"></span></div>
+            <div class="dice-face face-3"><span class="pip"></span><span class="pip"></span><span class="pip"></span></div>
+            <div class="dice-face face-4"><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span></div>
+            <div class="dice-face face-5"><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span></div>
+            <div class="dice-face face-6"><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span></div>
+          </div>
+          <div class="dice-shadow-floor" id="dice-shadow-2"></div>
         </div>
       </div>
 
       <div class="dice-result-banner" id="dice-result-banner">
-        <span class="dice-result-text" id="dice-result-text">Tap roll to throw dice!</span>
+        <span class="dice-result-text" id="dice-result-text">Tap roll to throw 3D dice!</span>
       </div>
 
       <div class="dice-controls-row">
         <button type="button" class="btn btn-primary" id="btn-roll-3d-dice" style="flex: 1; padding: 12px; font-weight: 700;">🎲 Roll 3D Dice</button>
-        <button type="button" class="btn btn-secondary" id="btn-share-dice-result" style="padding: 12px;">📤 Post to Chat</button>
+        <button type="button" class="btn btn-secondary" id="btn-share-dice-result" style="padding: 12px;">⚔️ Challenge Room</button>
       </div>
     </div>
   </div>
@@ -1574,6 +1681,21 @@
     </div>
   </div>
 
+  <!-- 📩 Private Room Invitation Toast -->
+  <div class="contact-request-toast" id="room-invite-toast" style="display: none; border-color: rgba(52, 199, 89, 0.4);">
+    <div class="contact-toast-content">
+      <div class="peer-avatar group" style="background: #34c759;">🔒</div>
+      <div class="contact-toast-text">
+        <strong id="room-invite-name">Room Invite</strong>
+        <p id="room-invite-desc">invited you to join a private room</p>
+      </div>
+    </div>
+    <div class="contact-toast-actions">
+      <button type="button" class="btn btn-primary btn-sm" id="btn-accept-room-invite" style="background: #34c759;">Join Room</button>
+      <button type="button" class="btn btn-secondary btn-sm" id="btn-decline-room-invite">Dismiss</button>
+    </div>
+  </div>
+
   <!-- 🖱️ Universal App Context Menu (Desktop Right-Click & Mobile Long-Press) -->
   <div class="app-context-menu" id="app-context-menu" style="display: none;">
     <!-- Quick Emoji Reactions Strip -->
@@ -1619,6 +1741,6 @@
     </div>
   </div>
 
-  <script src="./app.js?v=3.4"></script>
+  <script src="./app.js?v=3.5"></script>
 </body>
 </html>

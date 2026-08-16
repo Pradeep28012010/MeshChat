@@ -245,6 +245,15 @@ function getPeerList() {
   return list;
 }
 
+function getChannelsForPeer(peerId) {
+  return serverChannels.filter(ch => {
+    if (!ch.isPrivate) return true;
+    if (ch.creatorId === peerId) return true;
+    if (ch.members && Array.isArray(ch.members) && ch.members.includes(peerId)) return true;
+    return false;
+  });
+}
+
 wss.on('connection', (ws, req) => {
   let currentPeerId = null;
   ws.isAlive = true;
@@ -266,12 +275,12 @@ wss.on('connection', (ws, req) => {
             }
           });
 
-          // Send welcome acknowledgment + current peer list + recent session messages + channels + allNotes + contacts
+          // Send welcome acknowledgment + current peer list + recent session messages + allowed channels + allNotes + contacts
           ws.send(JSON.stringify({
             type: 'WELCOME',
             peerId: currentPeerId,
             peers: getPeerList(),
-            channels: serverChannels,
+            channels: getChannelsForPeer(currentPeerId),
             recentMessages: sessionMessages.slice(-100),
             serverAddresses: getLocalIPAddresses(),
             allNotes: activeSharedNotes,
@@ -310,7 +319,7 @@ wss.on('connection', (ws, req) => {
           ws.send(JSON.stringify({
             type: 'SYNC_RESPONSE',
             messages: missed,
-            channels: serverChannels,
+            channels: getChannelsForPeer(currentPeerId),
             allNotes: activeSharedNotes,
             acceptedContacts: Array.from(acceptedContactPairs),
             sharedTimer: activeSharedTimer,
@@ -560,16 +569,103 @@ wss.on('connection', (ws, req) => {
           break;
         }
 
-        // Custom Sub-Channels Creation & Deletion
+        // Custom Sub-Channels Creation, Privacy & Member Management
         case 'CHANNEL_CREATE': {
           if (data.channel && !serverChannels.find(c => c.id === data.channel.id)) {
-            serverChannels.push(data.channel);
+            const ch = {
+              ...data.channel,
+              creatorId: currentPeerId,
+              creatorName: connectedPeers.get(currentPeerId)?.info?.name || 'Admin',
+              members: data.channel.members || [currentPeerId],
+              createdAt: Date.now()
+            };
+            serverChannels.push(ch);
             saveChannelsToDisk();
+
+            if (ch.isPrivate) {
+              // Send only to creator and initial invited members
+              ch.members.forEach(memId => {
+                sendToPeer(memId, {
+                  type: 'CHANNEL_CREATE',
+                  channel: ch
+                });
+              });
+            } else {
+              broadcast({
+                type: 'CHANNEL_CREATE',
+                channel: ch
+              });
+            }
           }
-          broadcast({
-            type: 'CHANNEL_CREATE',
-            channel: data.channel
-          });
+          break;
+        }
+
+        case 'ROOM_INVITE': {
+          const ch = serverChannels.find(c => c.id === data.channelId);
+          if (ch && data.targetPeerId) {
+            if (!ch.members) ch.members = [ch.creatorId];
+            if (!ch.members.includes(data.targetPeerId)) {
+              ch.members.push(data.targetPeerId);
+              saveChannelsToDisk();
+            }
+
+            // Notify target peer with invite packet
+            sendToPeer(data.targetPeerId, {
+              type: 'ROOM_INVITE',
+              channel: ch,
+              inviterName: connectedPeers.get(currentPeerId)?.info?.name || 'Admin'
+            });
+
+            // Update room members for all current members
+            ch.members.forEach(memId => {
+              sendToPeer(memId, {
+                type: 'CHANNEL_UPDATE',
+                channel: ch
+              });
+            });
+          }
+          break;
+        }
+
+        case 'ROOM_MEMBER_KICK': {
+          const ch = serverChannels.find(c => c.id === data.channelId);
+          if (ch && (ch.creatorId === currentPeerId || ch.creatorId === data.adminId)) {
+            if (ch.members) {
+              ch.members = ch.members.filter(m => m !== data.targetMemberId);
+              saveChannelsToDisk();
+            }
+
+            // Notify kicked member
+            sendToPeer(data.targetMemberId, {
+              type: 'ROOM_KICKED',
+              channelId: ch.id,
+              channelName: ch.name
+            });
+
+            // Update channel for remaining members
+            ch.members.forEach(memId => {
+              sendToPeer(memId, {
+                type: 'CHANNEL_UPDATE',
+                channel: ch
+              });
+            });
+          }
+          break;
+        }
+
+        case 'ROOM_LEAVE': {
+          const ch = serverChannels.find(c => c.id === data.channelId);
+          if (ch && ch.members) {
+            ch.members = ch.members.filter(m => m !== currentPeerId);
+            saveChannelsToDisk();
+
+            ch.members.forEach(memId => {
+              sendToPeer(memId, {
+                type: 'CHANNEL_UPDATE',
+                channel: ch
+              });
+            });
+          }
           break;
         }
 
