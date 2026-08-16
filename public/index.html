@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="description" content="Zero-Internet Offline Messaging, Calling, GPS Map, Walkie-Talkie & Survival Suite">
   <link rel="manifest" href="./manifest.json">
-  <link rel="stylesheet" href="./styles.css?v=3.5">
+  <link rel="stylesheet" href="./styles.css?v=3.6">
   <title>MeshChat — Online Cloud & Offline Mesh Suite</title>
 </head>
 <body>
@@ -404,8 +404,28 @@
         </div>
       </div>
 
+      <!-- Interactive Peer Radar Tooltip Card -->
+      <div class="map-peer-card" id="map-peer-card" style="display: none;">
+        <div class="map-peer-card-header">
+          <div class="peer-avatar user" id="map-peer-card-avatar" style="width: 32px; height: 32px; font-size: 12px;">P</div>
+          <div class="map-peer-card-info">
+            <strong id="map-peer-card-name">Peer Name</strong>
+            <span id="map-peer-card-dist">45m away • NE 045°</span>
+          </div>
+          <button type="button" class="btn-close-reply" id="btn-close-map-peer-card" style="font-size: 16px; cursor: pointer;">&times;</button>
+        </div>
+        <div class="map-peer-card-actions">
+          <button type="button" class="btn btn-primary btn-sm" id="btn-map-chat-peer" style="flex: 1; padding: 6px 10px; font-size: 12px;">💬 Message</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-map-call-peer" style="flex: 1; padding: 6px 10px; font-size: 12px;">📞 Call</button>
+        </div>
+      </div>
+
       <div class="map-canvas-container">
         <canvas id="offline-map-canvas"></canvas>
+        <div class="map-zoom-controls">
+          <button type="button" class="map-zoom-btn" id="btn-map-zoom-in" title="Zoom In">+</button>
+          <button type="button" class="map-zoom-btn" id="btn-map-zoom-out" title="Zoom Out">&minus;</button>
+        </div>
       </div>
     </section>
 
@@ -1741,6 +1761,6 @@
     </div>
   </div>
 
-  <script src="./app.js?v=3.5"></script>
+  <script src="./app.js?v=3.6"></script>
 </body>
 </html>

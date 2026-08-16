@@ -254,6 +254,16 @@ function getChannelsForPeer(peerId) {
   });
 }
 
+const activePeerLocations = new Map();
+
+function getPeerLocationsList() {
+  const list = [];
+  for (const [id, loc] of activePeerLocations.entries()) {
+    list.push({ peerId: id, ...loc });
+  }
+  return list;
+}
+
 wss.on('connection', (ws, req) => {
   let currentPeerId = null;
   ws.isAlive = true;
@@ -275,12 +285,13 @@ wss.on('connection', (ws, req) => {
             }
           });
 
-          // Send welcome acknowledgment + current peer list + recent session messages + allowed channels + allNotes + contacts
+          // Send welcome acknowledgment + current peer list + recent session messages + allowed channels + allNotes + contacts + peerLocations
           ws.send(JSON.stringify({
             type: 'WELCOME',
             peerId: currentPeerId,
             peers: getPeerList(),
             channels: getChannelsForPeer(currentPeerId),
+            peerLocations: getPeerLocationsList(),
             recentMessages: sessionMessages.slice(-100),
             serverAddresses: getLocalIPAddresses(),
             allNotes: activeSharedNotes,
@@ -320,6 +331,7 @@ wss.on('connection', (ws, req) => {
             type: 'SYNC_RESPONSE',
             messages: missed,
             channels: getChannelsForPeer(currentPeerId),
+            peerLocations: getPeerLocationsList(),
             allNotes: activeSharedNotes,
             acceptedContacts: Array.from(acceptedContactPairs),
             sharedTimer: activeSharedTimer,
@@ -833,6 +845,13 @@ wss.on('connection', (ws, req) => {
 
         // Live GPS Position Broadcast & Waypoints
         case 'GPS_BROADCAST': {
+          if (data.coords) {
+            activePeerLocations.set(currentPeerId, {
+              name: data.senderName || 'Peer',
+              coords: data.coords,
+              timestamp: Date.now()
+            });
+          }
           broadcast({
             type: 'GPS_BROADCAST',
             senderId: currentPeerId,
@@ -987,6 +1006,7 @@ wss.on('connection', (ws, req) => {
       // ONLY delete if this socket is still the active socket for currentPeerId
       if (existing && existing.ws === ws) {
         connectedPeers.delete(currentPeerId);
+        activePeerLocations.delete(currentPeerId);
         broadcast({
           type: 'PEER_LEFT',
           peerId: currentPeerId,
