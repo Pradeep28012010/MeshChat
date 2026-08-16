@@ -927,12 +927,12 @@ const safeCleanupInterval = setInterval(() => {
 
 wss.on('close', () => clearInterval(safeCleanupInterval));
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log('\n======================================================');
-  console.log('🚀 OFFLINE ZERO-INTERNET MESSAGING HUB STARTED');
+  console.log(`🚀 MESHCAT SERVER STARTED ON PORT ${PORT}`);
   console.log('======================================================');
   const ips = getLocalIPAddresses();
-  console.log('📱 Devices on this Wi-Fi/Hotspot can open in browser:');
+  console.log('📱 Accessible addresses:');
   ips.forEach(ip => {
     console.log(`   ➜  ${ip.interface.padEnd(18)} : ${ip.url}`);
   });
