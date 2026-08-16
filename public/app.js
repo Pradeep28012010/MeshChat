@@ -5292,17 +5292,6 @@
     row.innerHTML = `
       ${!isSelf ? `<div class="msg-sender">${senderDisplay}</div>` : ''}
       
-      <div class="msg-actions-hover">
-        <button class="hover-action-btn" data-action="react" data-msg-id="${msg.id}" data-emoji="👍">👍</button>
-        <button class="hover-action-btn" data-action="react" data-msg-id="${msg.id}" data-emoji="❤️">❤️</button>
-        <button class="hover-action-btn" data-action="react" data-msg-id="${msg.id}" data-emoji="🔥">🔥</button>
-        <button class="hover-action-btn ${isStarred ? 'self-reacted' : ''}" data-action="star" data-msg-id="${msg.id}" title="Star message">${isStarred ? '⭐' : '☆'}</button>
-        <button class="hover-action-btn" data-action="reply" data-msg-id="${msg.id}" title="Reply">↩</button>
-        <button class="hover-action-btn" data-action="pin" data-msg-id="${msg.id}" title="Pin to top">📌</button>
-        ${isSelf && msg.text ? `<button class="hover-action-btn" data-action="edit" data-msg-id="${msg.id}" title="Edit message">✏️</button>` : ''}
-        ${isSelf ? `<button class="hover-action-btn" data-action="delete" data-msg-id="${msg.id}" title="Delete for everyone" style="color: #ff3b30;">🗑️</button>` : `<button class="hover-action-btn" data-action="delete-me" data-msg-id="${msg.id}" title="Delete for me" style="color: #ff3b30;">🗑️</button>`}
-      </div>
-
       <div class="msg-bubble ${msg.type === 'ai_reply' ? 'ai-bubble-reply' : ''}">
         ${contentHtml}
         ${reactionsHtml}
@@ -5342,21 +5331,6 @@
     row.querySelectorAll('.ttt-cell').forEach(cell => {
       cell.addEventListener('click', () => {
         handleTttCellClick(cell.dataset.gameId, parseInt(cell.dataset.cellIdx, 10));
-      });
-    });
-
-    row.querySelectorAll('.hover-action-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const action = btn.dataset.action;
-        const msgId = btn.dataset.msgId;
-        if (action === 'react') sendReaction(msgId, btn.dataset.emoji);
-        else if (action === 'star') toggleStarMessage(msgId);
-        else if (action === 'reply') startReply(msg);
-        else if (action === 'pin') pinMessageToTop(msg);
-        else if (action === 'edit') startEditingMessage(msg);
-        else if (action === 'delete') deleteMessageForEveryone(msgId);
-        else if (action === 'delete-me') deleteMessageForMe(msgId);
       });
     });
 

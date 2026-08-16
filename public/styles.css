@@ -1139,41 +1139,6 @@ body.dark-theme .peer-avatar {
   display: block;
 }
 
-.msg-row:hover .msg-actions-hover {
-  opacity: 1;
-}
-
-.msg-actions-hover {
-  position: absolute;
-  top: -12px;
-  right: 8px;
-  display: flex;
-  gap: 4px;
-  opacity: 0;
-  transition: opacity var(--trans-fast);
-  z-index: 10;
-}
-
-.msg-row.peer .msg-actions-hover {
-  right: auto;
-  left: 8px;
-}
-
-.hover-action-btn {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-divider);
-  border-radius: var(--radius-full);
-  padding: 2px 6px;
-  font-size: 12px;
-  cursor: pointer;
-  box-shadow: var(--shadow-subtle);
-  transition: transform var(--trans-fast);
-}
-
-.hover-action-btn:hover {
-  transform: scale(1.15);
-}
-
 .reaction-chips-row {
   display: flex;
   gap: 4px;
