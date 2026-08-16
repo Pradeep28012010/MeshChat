@@ -684,18 +684,24 @@ wss.on('connection', (ws, req) => {
         case 'ROOM_INVITE': {
           const ch = serverChannels.find(c => c.id === data.channelId);
           if (ch && data.targetPeerId) {
-            if (!ch.members) ch.members = [ch.creatorId];
-            if (!ch.members.includes(data.targetPeerId)) {
-              ch.members.push(data.targetPeerId);
-              saveChannelsToDisk();
-            }
-
-            // Notify target peer with invite packet
+            // Notify target peer with invite packet without adding them to members yet
             sendToPeer(data.targetPeerId, {
               type: 'ROOM_INVITE',
               channel: ch,
               inviterName: connectedPeers.get(currentPeerId)?.info?.name || 'Admin'
             });
+          }
+          break;
+        }
+
+        case 'ROOM_INVITE_ACCEPT': {
+          const ch = serverChannels.find(c => c.id === data.channelId);
+          if (ch) {
+            if (!ch.members) ch.members = [ch.creatorId];
+            if (!ch.members.includes(currentPeerId)) {
+              ch.members.push(currentPeerId);
+              saveChannelsToDisk();
+            }
 
             // Update room members for all current members
             ch.members.forEach(memId => {
@@ -811,14 +817,16 @@ wss.on('connection', (ws, req) => {
             durationSec: data.durationSec || 300,
             startedAt: data.startedAt,
             isRunning: !!data.isRunning,
-            senderName: data.senderName || 'Peer'
+            senderName: data.senderName || 'Peer',
+            targetChannelId: data.targetChannelId || null,
+            targetPeerId: data.targetPeerId || null
           };
 
           broadcast({
             type: 'TIMER_SYNC',
             timer: activeSharedTimer,
             senderId: currentPeerId
-          }, ws);
+          });
           break;
         }
 

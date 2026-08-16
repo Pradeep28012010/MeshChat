@@ -1,33 +1,31 @@
-# 📡 MeshChat — Zero-Internet Offline Communication & Survival Suite
+# 📡 MeshChat — Modern Online Cloud & Offline Mesh Messaging Suite
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/Node.js-18%2B-brightgreen.svg)](https://nodejs.org/)
 [![WebRTC](https://img.shields.io/badge/WebRTC-P2P%20Media-orange.svg)](https://webrtc.org/)
 [![Encryption](https://img.shields.io/badge/Encryption-AES--256--GCM-success.svg)](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto)
 
-> An Apple-inspired, **zero-internet, zero-cloud offline & online hybrid web suite** for encrypted messaging, P2P video/voice calling, tactical GPS breadcrumbs, and live walkie-talkie radio. Runs directly in any modern mobile or desktop browser with **zero external hardware or app installations required**.
+> An Apple-grade, **Online Cloud & Zero-Internet Offline Mesh hybrid web suite** for end-to-end encrypted messaging, private topic rooms, 1-on-1 direct messaging, live WebRTC video/audio calling, interactive GPS street maps, multiplayer duel mini-games, synchronized group countdowns, and walkie-talkie radio. Runs seamlessly across iOS, Android, macOS, Windows, and Linux browsers with **zero app installations required**.
 
 ---
 
-## 🌟 Key Features
+## 🌟 Key Capabilities
 
-### 💬 1. Zero-Internet Encrypted Messaging
-* **Client-Side E2EE**: 256-bit AES-GCM encryption powered by browser-native `SubtleCrypto`. Plaintext never leaves your device.
-* **Offline Voice Memos**: In-browser microphone recorder with interactive waveform playback.
-* **File & Photo Transfers**: Local high-speed LAN file sharing with inline image previews and download actions.
-* **Emoji Reactions & Replies**: Thread quote quoting (`↩`) and quick emoji reactions (`👍`, `❤️`, `📍`, `⚠️`, `🚩`).
-* **Offline Search & Export**: Instant full-text search across local `IndexedDB` history and one-click `.txt` transcript downloads.
+### 💬 1. Hybrid Encrypted Messaging & Private Channels
+* **Online Cloud & Local Mesh**: Automatic failover between global cloud links and zero-internet local Wi-Fi/Hotspots.
+* **Client-Side E2EE**: 256-bit AES-GCM on-device encryption powered by browser-native `SubtleCrypto`.
+* **Private & Public Topic Rooms**: Password-protected private rooms with invite-only access enforcement.
+* **Direct Messages (DMs)**: Private peer-to-peer conversations with search and contact approvals.
+* **Voice Memos & Rich Media**: Waveform audio notes, sketches, photos, and file attachments.
+* **Custom Disappearing Messages**: Precision self-destruct timers (5s to 24h or custom seconds).
+* **Synchronized Group Countdowns**: Real-time ticking timers synchronized across all devices in a room.
+* **Multiplayer In-Chat Games**: Live Rock-Paper-Scissors duels, 3D Dice toss, and Turn-based Tic-Tac-Toe.
 
-### 📞 2. Offline & Online WebRTC Audio / Video Calling
-* **Zero-Internet Local Media**: Direct browser-to-browser P2P media streams (`iceServers: []`) over local Wi-Fi/Hotspot.
-* **Online STUN Support**: Automatic NAT traversal using Google STUN relays when connected to the internet.
-* **Apple-Inspired In-Call UX**: Incoming call sheet with synthesized dual-tone ringtones, full-bleed video with picture-in-picture local camera preview, and floating control dock (Mute, Camera Toggle, End Call).
-
-### 🗺️ 3. Tactical GPS Map & Trail Breadcrumb Tracker
-* **Offline 2D Canvas Radar**: Grid coordinate overlay, range rings (`100m`, `250m`, `500m`), and compass rose orientation.
-* **GPS Breadcrumbs**: Automatically logs and renders your group's walking path so separated hikers can backtrack.
-* **Live Peer Radar**: Real-time position markers and distance calculations for all mesh members.
-* **Custom Waypoints**: Drop interactive map pins (`⛺ Campsite`, `💧 Water Source`, `🚗 Vehicle`, `🚩 Meeting Point`).
+### 🗺️ 2. Interactive GPS Street Map & Radar
+* **Online OpenStreetMap & Satellite View**: Crisp street and building maps with search place geolocation.
+* **Pin-point Draggable Calibration**: Fine-tune desktop or mobile GPS position down to exact street addresses.
+* **Zero-Internet Tactical Radar**: Offline canvas radar with range rings, azimuth HUD, and GPX trail export.
+* **Interactive Waypoints**: Custom icons for rendezvous points, campsites, vehicles, and hazards.
 
 ### 📻 4. Offline Walkie-Talkie / Push-to-Talk (PTT)
 * **Hold to Talk, Release to Broadcast**: Large tactile button for instant voice blasts to the entire mesh.

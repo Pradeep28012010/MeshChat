@@ -3553,6 +3553,84 @@ body.dark-theme .vox-meter-track {
   padding: 0 4px;
 }
 
+/* Real-Time Synchronized Group Timer Bar */
+.active-group-timer-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-divider);
+  z-index: 11;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  animation: fadeIn 0.2s ease-out;
+}
+
+.timer-bar-icon {
+  font-size: 15px;
+  animation: pulse-mic 2s infinite ease-in-out;
+}
+
+.timer-bar-info {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.timer-bar-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+.timer-bar-clock {
+  font-size: 13px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  color: var(--accent-blue);
+  letter-spacing: 0.5px;
+}
+
+.timer-bar-track {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-app);
+  border-radius: 3px;
+  overflow: hidden;
+  margin: 0 4px;
+}
+
+.timer-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #38bdf8, #007aff);
+  border-radius: 3px;
+  transition: width 1s linear;
+}
+
+.btn-stop-timer {
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 4px;
+  transition: color 0.15s ease;
+}
+
+.btn-stop-timer:hover {
+  color: #ff3b30;
+}
+
+/* Peer Search / New DM Modal List */
+.new-dm-peers-list .squad-item-card {
+  cursor: pointer;
+}
+
 /* ==========================================================
    📊 INTERACTIVE GROUP POLLS
    ========================================================== */

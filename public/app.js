@@ -380,10 +380,16 @@
     
     // Channels & Targets
     activeTargetId: 'broadcast',
-    activeChannelId: localStorage.getItem('mesh_active_channel') || 'general',
-    channels: JSON.parse(localStorage.getItem('mesh_channels') || 'null') || [
-      { id: 'general', name: 'general', isPrivate: false }
-    ],
+    activeChannelId: localStorage.getItem('mesh_active_channel') || null,
+    channels: (() => {
+      const PURGE_KEY = 'mesh_channels_purged_v5';
+      if (localStorage.getItem(PURGE_KEY) !== 'true') {
+        localStorage.removeItem('mesh_channels');
+        localStorage.removeItem('mesh_active_channel');
+        localStorage.setItem(PURGE_KEY, 'true');
+      }
+      return JSON.parse(localStorage.getItem('mesh_channels') || '[]');
+    })(),
 
     // Collaborative Notes (Context-Specific)
     sharedNote: {
@@ -632,6 +638,8 @@
     rpsModalCloseBtn: document.getElementById('rps-modal-close-btn'),
     btnRpsModeChallenge: document.getElementById('btn-rps-mode-challenge'),
     btnRpsModeBot: document.getElementById('btn-rps-mode-bot'),
+    rpsSelfAvatar: document.getElementById('rps-self-avatar'),
+    rpsPeerAvatar: document.getElementById('rps-peer-avatar'),
     rpsSelfHand: document.getElementById('rps-self-hand'),
     rpsPeerHand: document.getElementById('rps-peer-hand'),
     rpsStatusBadge: document.getElementById('rps-status-badge'),
@@ -761,6 +769,26 @@
     pinnedMessageBanner: document.getElementById('pinned-message-banner'),
     pinnedSnippet: document.getElementById('pinned-snippet'),
     btnUnpin: document.getElementById('btn-unpin'),
+
+    // Synchronized Group Timer Bar & Modal
+    activeGroupTimerBar: document.getElementById('active-group-timer-bar'),
+    groupTimerTitle: document.getElementById('group-timer-title'),
+    groupTimerClock: document.getElementById('group-timer-clock'),
+    groupTimerProgress: document.getElementById('group-timer-progress'),
+    btnDismissGroupTimer: document.getElementById('btn-dismiss-group-timer'),
+    syncTimerTitleInput: document.getElementById('sync-timer-title-input'),
+    syncTimerCustomMins: document.getElementById('sync-timer-custom-mins'),
+
+    // Direct Messages & Peer Search Modal
+    btnOpenNewDm: document.getElementById('btn-open-new-dm'),
+    newDmModalOverlay: document.getElementById('new-dm-modal-overlay'),
+    newDmModalCloseBtn: document.getElementById('new-dm-modal-close-btn'),
+    newDmSearchInput: document.getElementById('new-dm-search-input'),
+    newDmPeersList: document.getElementById('new-dm-peers-list'),
+
+    // Disappearing Custom Inputs
+    disappearingCustomInput: document.getElementById('disappearing-custom-input'),
+    btnSetCustomDisappearing: document.getElementById('btn-set-custom-disappearing'),
 
     editBar: document.getElementById('edit-bar'),
     editSnippet: document.getElementById('edit-snippet'),
@@ -988,6 +1016,9 @@
 
   // --- 6. ⏱️ Synchronized Group Timer Engine ---
   function openTimerModal() {
+    if (elements.syncTimerTitleInput) {
+      elements.syncTimerTitleInput.value = state.sharedTimer.title || 'Group Rendezvous';
+    }
     updateTimerDisplay();
     elements.timerModalOverlay.classList.add('active');
   }
@@ -998,7 +1029,9 @@
       durationSec: durationSec,
       startedAt: Date.now(),
       isRunning: true,
-      senderName: state.self.name
+      senderName: state.self.name,
+      targetChannelId: state.activeTargetId === 'broadcast' ? state.activeChannelId : null,
+      targetPeerId: state.activeTargetId !== 'broadcast' ? state.activeTargetId : null
     };
 
     updateTimerDisplay();
@@ -1011,7 +1044,9 @@
         durationSec: durationSec,
         startedAt: state.sharedTimer.startedAt,
         isRunning: true,
-        senderName: state.self.name
+        senderName: state.self.name,
+        targetChannelId: state.sharedTimer.targetChannelId,
+        targetPeerId: state.sharedTimer.targetPeerId
       }));
     }
   }
@@ -1021,6 +1056,7 @@
     state.sharedTimer.startedAt = null;
     if (state.timerInterval) clearInterval(state.timerInterval);
     updateTimerDisplay();
+    updateSharedTimerBanner();
 
     if (state.ws && state.ws.readyState === WebSocket.OPEN) {
       state.ws.send(JSON.stringify({
@@ -1032,11 +1068,40 @@
     }
   }
 
+  function updateSharedTimerBanner() {
+    if (!elements.activeGroupTimerBar) return;
+    if (!state.sharedTimer || !state.sharedTimer.isRunning || !state.sharedTimer.startedAt) {
+      elements.activeGroupTimerBar.style.display = 'none';
+      return;
+    }
+
+    const elapsed = Math.floor((Date.now() - state.sharedTimer.startedAt) / 1000);
+    const remain = Math.max(0, state.sharedTimer.durationSec - elapsed);
+
+    if (remain <= 0) {
+      elements.activeGroupTimerBar.style.display = 'none';
+      return;
+    }
+
+    const mins = String(Math.floor(remain / 60)).padStart(2, '0');
+    const secs = String(remain % 60).padStart(2, '0');
+
+    if (elements.groupTimerTitle) elements.groupTimerTitle.textContent = state.sharedTimer.title || 'Group Countdown';
+    if (elements.groupTimerClock) elements.groupTimerClock.textContent = `${mins}:${secs}`;
+    if (elements.groupTimerProgress) {
+      const pct = Math.max(0, Math.min(100, (remain / state.sharedTimer.durationSec) * 100));
+      elements.groupTimerProgress.style.width = `${pct}%`;
+    }
+    elements.activeGroupTimerBar.style.display = 'flex';
+  }
+
   function startLocalTimerTicker() {
     if (state.timerInterval) clearInterval(state.timerInterval);
+    updateSharedTimerBanner();
     state.timerInterval = setInterval(() => {
       if (!state.sharedTimer.isRunning || !state.sharedTimer.startedAt) {
         clearInterval(state.timerInterval);
+        updateSharedTimerBanner();
         return;
       }
 
@@ -1045,32 +1110,39 @@
 
       const mins = String(Math.floor(remain / 60)).padStart(2, '0');
       const secs = String(remain % 60).padStart(2, '0');
-      elements.timerDigitsVal.textContent = `${mins}:${secs}`;
+      if (elements.timerDigitsVal) elements.timerDigitsVal.textContent = `${mins}:${secs}`;
+
+      updateSharedTimerBanner();
 
       if (remain <= 0) {
         state.sharedTimer.isRunning = false;
         clearInterval(state.timerInterval);
+        updateSharedTimerBanner();
+        updateTimerDisplay();
         playSound('timer_done');
-        alert(`⏱️ COUNTDOWN COMPLETE: "${state.sharedTimer.title}" has finished!`);
+        showNotificationToast(`⏰ TIMER COMPLETE: "${state.sharedTimer.title}" has ended!`);
       }
     }, 500);
   }
 
   function updateTimerDisplay() {
+    if (!elements.timerDigitsVal) return;
     if (state.sharedTimer.isRunning && state.sharedTimer.startedAt) {
       const elapsed = Math.floor((Date.now() - state.sharedTimer.startedAt) / 1000);
       const remain = Math.max(0, state.sharedTimer.durationSec - elapsed);
       const mins = String(Math.floor(remain / 60)).padStart(2, '0');
       const secs = String(remain % 60).padStart(2, '0');
       elements.timerDigitsVal.textContent = `${mins}:${secs}`;
-      elements.btnStartSyncTimer.textContent = 'Timer Running';
+      if (elements.btnStartSyncTimer) elements.btnStartSyncTimer.textContent = 'Timer Running';
     } else {
       const mins = String(Math.floor(state.sharedTimer.durationSec / 60)).padStart(2, '0');
       const secs = String(state.sharedTimer.durationSec % 60).padStart(2, '0');
       elements.timerDigitsVal.textContent = `${mins}:${secs}`;
-      elements.btnStartSyncTimer.textContent = 'Start Timer for All';
+      if (elements.btnStartSyncTimer) elements.btnStartSyncTimer.textContent = 'Start Timer for All';
     }
-    elements.timerTitleBadge.textContent = state.sharedTimer.title || 'Group Timer';
+    if (elements.timerTitleBadge) {
+      elements.timerTitleBadge.textContent = state.sharedTimer.title || 'Group Timer';
+    }
   }
 
   function handleIncomingTimerSync(data) {
@@ -1079,8 +1151,9 @@
       updateTimerDisplay();
       if (state.sharedTimer.isRunning) {
         startLocalTimerTicker();
-      } else if (state.timerInterval) {
-        clearInterval(state.timerInterval);
+      } else {
+        if (state.timerInterval) clearInterval(state.timerInterval);
+        updateSharedTimerBanner();
       }
     }
   }
@@ -1492,7 +1565,6 @@
 
   function canAccessChannel(ch) {
     if (!ch) return false;
-    if (ch.id === 'general') return true;
     if (!ch.isPrivate) return true;
     if (ch.creatorId === state.self.id) return true;
     if (ch.members && Array.isArray(ch.members) && ch.members.includes(state.self.id)) return true;
@@ -1502,9 +1574,18 @@
   function renderChannelsList() {
     if (!elements.channelsList) return;
     elements.channelsList.innerHTML = '';
-    state.channels.forEach(ch => {
-      if (!canAccessChannel(ch)) return;
+    const visibleChannels = state.channels.filter(ch => canAccessChannel(ch));
 
+    if (visibleChannels.length === 0) {
+      elements.channelsList.innerHTML = `
+        <div style="padding: 10px 12px; font-size: 11.5px; color: var(--text-tertiary); font-style: italic;">
+          No topic rooms created yet. Tap <strong>+</strong> above to create one.
+        </div>
+      `;
+      return;
+    }
+
+    visibleChannels.forEach(ch => {
       const isAct = state.activeTargetId === 'broadcast' && state.activeChannelId === ch.id;
       const isCreator = ch.creatorId === state.self.id;
       const div = document.createElement('div');
@@ -1516,7 +1597,7 @@
           <span class="channel-name">${escapeHtml(ch.name)}</span>
           ${isCreator ? '<span style="font-size:10px;" title="Room Owner">👑</span>' : ''}
         </div>
-        ${ch.id !== 'general' && isCreator ? `<button class="btn-delete-channel" data-channel-id="${escapeHtml(ch.id)}" title="Delete Room">✕</button>` : ''}
+        ${isCreator ? `<button class="btn-delete-channel" data-channel-id="${escapeHtml(ch.id)}" title="Delete Room">✕</button>` : ''}
       `;
       div.onclick = (e) => {
         if (e.target.classList.contains('btn-delete-channel')) {
@@ -1531,7 +1612,6 @@
   }
 
   function deleteChannel(chId) {
-    if (chId === 'general') return;
     const ch = state.channels.find(c => c.id === chId);
     const chName = ch ? ch.name : chId;
     if (!confirm(`Are you sure you want to delete room #${chName} and all its messages for everyone?`)) return;
@@ -1541,7 +1621,12 @@
     state.messages = state.messages.filter(m => m.channelId !== chId);
 
     if (state.activeChannelId === chId) {
-      selectChannel('general');
+      const remaining = state.channels.filter(c => canAccessChannel(c));
+      if (remaining.length > 0) {
+        selectChannel(remaining[0].id);
+      } else {
+        selectChatTarget('broadcast');
+      }
     } else {
       renderChannelsList();
     }
@@ -1556,17 +1641,17 @@
   function selectChannel(channelId) {
     state.activeTargetId = 'broadcast';
     state.activeChannelId = channelId;
-    localStorage.setItem('mesh_active_channel', channelId);
+    if (channelId) localStorage.setItem('mesh_active_channel', channelId);
+    else localStorage.removeItem('mesh_active_channel');
 
     renderChannelsList();
     renderPeerList(Array.from(state.peers.values()));
 
     const ch = state.channels.find(c => c.id === channelId);
-    const chName = ch ? `${ch.isPrivate ? '🔒 ' : '#'}${ch.name}` : '#general';
-    const memberCount = (ch && ch.members) ? ch.members.length : (state.peers.size + 1);
+    const chName = ch ? `${ch.isPrivate ? '🔒 ' : '#'}${ch.name}` : 'General Broadcast';
 
     elements.activeChatTitle.textContent = chName;
-    elements.activeChatStatus.textContent = ch ? (ch.topic || (ch.isPrivate ? 'Private Room • Invite Only' : 'Public Room • Local Mesh')) : 'Public Topic Room';
+    elements.activeChatStatus.textContent = ch ? (ch.topic || (ch.isPrivate ? 'Private Room • Invite Only' : 'Public Room • Online Cloud & Mesh')) : 'Public Broadcast Mesh';
     elements.activeChatAvatar.className = 'peer-avatar group';
     elements.activeChatAvatar.innerHTML = `
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1756,7 +1841,9 @@
     }
 
     elements.roomSettingsModalOverlay.classList.remove('active');
-    selectChannel('general');
+    const remaining = state.channels.filter(c => canAccessChannel(c));
+    if (remaining.length > 0) selectChannel(remaining[0].id);
+    else selectChatTarget('broadcast');
   }
 
   let activeIncomingRoomInvite = null;
@@ -1774,6 +1861,9 @@
   function acceptRoomInvite() {
     if (!activeIncomingRoomInvite) return;
     const ch = activeIncomingRoomInvite;
+    if (!ch.members) ch.members = [];
+    if (!ch.members.includes(state.self.id)) ch.members.push(state.self.id);
+
     if (!state.channels.find(c => c.id === ch.id)) {
       state.channels.push(ch);
     } else {
@@ -1783,8 +1873,16 @@
     localStorage.setItem('mesh_channels', JSON.stringify(state.channels));
     if (elements.roomInviteToast) elements.roomInviteToast.style.display = 'none';
 
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+      state.ws.send(JSON.stringify({
+        type: 'ROOM_INVITE_ACCEPT',
+        channelId: ch.id
+      }));
+    }
+
     renderChannelsList();
     selectChannel(ch.id);
+    activeIncomingRoomInvite = null;
   }
 
   function declineRoomInvite() {
@@ -1793,6 +1891,9 @@
   }
 
   function handleIncomingChannelCreate(data) {
+    if (!data.channel) return;
+    if (data.channel.isPrivate && !canAccessChannel(data.channel)) return;
+
     if (!state.channels.find(c => c.id === data.channel.id)) {
       state.channels.push(data.channel);
       localStorage.setItem('mesh_channels', JSON.stringify(state.channels));
@@ -1806,7 +1907,9 @@
     state.messages = state.messages.filter(m => m.channelId !== data.channelId);
 
     if (state.activeChannelId === data.channelId) {
-      selectChannel('general');
+      const remaining = state.channels.filter(c => canAccessChannel(c));
+      if (remaining.length > 0) selectChannel(remaining[0].id);
+      else selectChatTarget('broadcast');
     } else {
       renderChannelsList();
     }
@@ -2208,6 +2311,44 @@
     const handEmojis = { rock: '🪨', paper: '📄', scissors: '✂️' };
     if (!msg || msg.status !== 'open') return;
 
+    const challengerMove = msg.challengerMove;
+    let outcome = 'tie';
+    let outcomeText = "🤝 It's a Tie / Draw!";
+    let winnerId = null;
+
+    if (challengerMove === opponentMove) {
+      outcome = 'tie';
+      outcomeText = "🤝 It's a Tie / Draw!";
+    } else if (
+      (challengerMove === 'rock' && opponentMove === 'scissors') ||
+      (challengerMove === 'paper' && opponentMove === 'rock') ||
+      (challengerMove === 'scissors' && opponentMove === 'paper')
+    ) {
+      outcome = 'challenger_win';
+      outcomeText = `🏆 ${msg.senderName} WINS!`;
+      winnerId = msg.senderId;
+    } else {
+      outcome = 'opponent_win';
+      outcomeText = `🏆 ${state.self.name} WINS!`;
+      winnerId = state.self.id;
+    }
+
+    msg.status = 'resolved';
+    msg.opponentName = state.self.name;
+    msg.opponentMove = opponentMove;
+    msg.outcomeText = outcomeText;
+    msg.winnerId = winnerId;
+    saveMessageToStorage(msg);
+    renderSingleMessageBubble(msg, msg.senderId === state.self.id);
+
+    triggerRpsShowdownAnimation({
+      challengerName: msg.senderName,
+      challengerMove: msg.challengerMove,
+      opponentName: state.self.name,
+      opponentMove: opponentMove,
+      outcomeText: outcomeText
+    });
+
     if (state.ws && state.ws.readyState === WebSocket.OPEN) {
       state.ws.send(JSON.stringify({
         type: 'RPS_ACCEPT',
@@ -2218,19 +2359,6 @@
         opponentName: state.self.name,
         opponentMove: opponentMove
       }));
-    } else {
-      // Local fallback calculation if offline
-      triggerRpsShowdownAnimation({
-        challengerName: msg.senderName,
-        challengerMove: msg.challengerMove,
-        opponentName: state.self.name,
-        opponentMove: opponentMove,
-        outcomeText: msg.challengerMove === opponentMove ? "🤝 It's a Tie / Draw!" : (
-          (opponentMove === 'rock' && msg.challengerMove === 'scissors') ||
-          (opponentMove === 'paper' && msg.challengerMove === 'rock') ||
-          (opponentMove === 'scissors' && msg.challengerMove === 'paper') ? `🏆 ${state.self.name} WINS!` : `🏆 ${msg.senderName} WINS!`
-        )
-      });
     }
   }
 
@@ -2238,26 +2366,34 @@
     const handEmojis = { rock: '🪨', paper: '📄', scissors: '✂️' };
     if (!elements.rpsModalOverlay) return;
 
-    if (elements.rpsSelfAvatar) elements.rpsSelfAvatar.textContent = data.challengerName;
-    if (elements.rpsPeerAvatar) elements.rpsPeerAvatar.textContent = data.opponentName;
-    elements.rpsSelfHand.textContent = '✊';
-    elements.rpsPeerHand.textContent = '✊';
-    elements.rpsSelfHand.classList.add('shaking');
-    elements.rpsPeerHand.classList.add('shaking');
-    elements.rpsResultText.textContent = '3... 2... 1... Showdown!';
+    if (elements.rpsSelfAvatar) elements.rpsSelfAvatar.textContent = data.challengerName || 'Challenger';
+    if (elements.rpsPeerAvatar) elements.rpsPeerAvatar.textContent = data.opponentName || 'Opponent';
+    if (elements.rpsSelfHand) {
+      elements.rpsSelfHand.textContent = '✊';
+      elements.rpsSelfHand.classList.add('shaking');
+    }
+    if (elements.rpsPeerHand) {
+      elements.rpsPeerHand.textContent = '✊';
+      elements.rpsPeerHand.classList.add('shaking');
+    }
+    if (elements.rpsResultText) elements.rpsResultText.textContent = '3... 2... 1... Showdown!';
     elements.rpsModalOverlay.classList.add('active');
     playSound('game_move');
     if ('vibrate' in navigator) navigator.vibrate([50, 50, 50]);
 
     setTimeout(() => {
-      elements.rpsSelfHand.classList.remove('shaking');
-      elements.rpsPeerHand.classList.remove('shaking');
-      elements.rpsSelfHand.textContent = handEmojis[data.challengerMove] || '✊';
-      elements.rpsPeerHand.textContent = handEmojis[data.opponentMove] || '✊';
-      elements.rpsResultText.textContent = `${data.outcomeText}`;
+      if (elements.rpsSelfHand) {
+        elements.rpsSelfHand.classList.remove('shaking');
+        elements.rpsSelfHand.textContent = handEmojis[data.challengerMove] || '✊';
+      }
+      if (elements.rpsPeerHand) {
+        elements.rpsPeerHand.classList.remove('shaking');
+        elements.rpsPeerHand.textContent = handEmojis[data.opponentMove] || '✊';
+      }
+      if (elements.rpsResultText) elements.rpsResultText.textContent = `${data.outcomeText}`;
       playSound('message_received');
       if ('vibrate' in navigator) navigator.vibrate(120);
-    }, 1000);
+    }, 1200);
   }
 
   function playRpsVsBot(myChoice) {
@@ -4737,12 +4873,15 @@
 
     if (layerType === 'satellite') {
       leafletTileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        maxZoom: 19
+        maxZoom: 19,
+        attribution: '&copy; Esri'
       }).addTo(leafletMap);
     } else {
-      // Standard vibrant OpenStreetMap with colored roads, cities, building footprints
-      leafletTileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19
+      // Standard vibrant OpenStreetMap with subdomains for instant loading
+      leafletTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        subdomains: ['a', 'b', 'c'],
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
       }).addTo(leafletMap);
     }
   }
@@ -6077,17 +6216,52 @@
     return [a, b].sort().join(':::');
   }
 
+  function hasActiveDmWith(peerId) {
+    if (state.contacts.has(peerId) || state.contacts.has(getPairKey(state.self.id, peerId))) return true;
+    if (state.activeTargetId === peerId) return true;
+    return state.messages.some(m => (m.senderId === peerId && m.targetId === state.self.id) || (m.senderId === state.self.id && m.targetId === peerId));
+  }
+
   function renderPeerList(peerArray = []) {
     state.peers.clear();
     const activeCount = peerArray.length;
-    elements.peerCountBadge.textContent = `${activeCount} Online`;
-
-    elements.peerList.innerHTML = '';
+    if (elements.peerCountBadge) {
+      elements.peerCountBadge.textContent = `${activeCount} Online`;
+    }
 
     peerArray.forEach((peer) => {
       state.peers.set(peer.id, peer);
-      if (peer.id === state.self.id) return;
+    });
 
+    if (!elements.peerList) return;
+    elements.peerList.innerHTML = '';
+
+    const visiblePeers = [];
+    peerArray.forEach((peer) => {
+      if (peer.id === state.self.id) return;
+      if (hasActiveDmWith(peer.id) || (state.searchQuery && peer.name.toLowerCase().includes(state.searchQuery))) {
+        visiblePeers.push(peer);
+      }
+    });
+
+    if (visiblePeers.length === 0) {
+      const emptyDiv = document.createElement('div');
+      emptyDiv.style.padding = '12px 14px';
+      emptyDiv.style.textAlign = 'center';
+      emptyDiv.style.fontSize = '11.5px';
+      emptyDiv.style.color = 'var(--text-tertiary)';
+      emptyDiv.innerHTML = `
+        <span>No active direct messages</span><br>
+        <button type="button" class="btn btn-secondary btn-sm" id="btn-empty-start-dm" style="margin-top: 6px; padding: 4px 10px; font-size: 11px; border-radius: 12px;">+ Start New Chat</button>
+      `;
+      const btn = emptyDiv.querySelector('#btn-empty-start-dm');
+      if (btn) btn.onclick = openNewDmModal;
+      elements.peerList.appendChild(emptyDiv);
+      updateCompassDisplay();
+      return;
+    }
+
+    visiblePeers.forEach((peer) => {
       const bat = state.peerBatteries.get(peer.id);
       const batHtml = bat ? `<span class="peer-battery-badge ${bat.level <= 20 ? 'low' : ''}">🔋 ${bat.level}%</span>` : '';
 
@@ -6130,16 +6304,76 @@
       }
 
       div.addEventListener('click', () => {
-        if (!isConnected) {
-          sendContactRequest(peer.id);
-        } else {
-          selectChatTarget(peer.id);
-        }
+        selectChatTarget(peer.id);
       });
       elements.peerList.appendChild(div);
     });
 
     updateCompassDisplay();
+  }
+
+  function openNewDmModal() {
+    renderNewDmList();
+    if (elements.newDmModalOverlay) elements.newDmModalOverlay.classList.add('active');
+  }
+
+  function closeNewDmModal() {
+    if (elements.newDmModalOverlay) elements.newDmModalOverlay.classList.remove('active');
+  }
+
+  function renderNewDmList(searchQ = '') {
+    if (!elements.newDmPeersList) return;
+    elements.newDmPeersList.innerHTML = '';
+    const q = searchQ.trim().toLowerCase();
+
+    const peers = Array.from(state.peers.values()).filter(p => p.id !== state.self.id);
+    const filtered = peers.filter(p => !q || p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q));
+
+    if (filtered.length === 0) {
+      elements.newDmPeersList.innerHTML = `
+        <div style="padding: 24px; text-align: center; color: var(--text-tertiary); font-size: 12.5px;">
+          ${q ? `No peers matching "${escapeHtml(q)}"` : 'No other peers are online right now'}
+        </div>
+      `;
+      return;
+    }
+
+    filtered.forEach(peer => {
+      const bat = state.peerBatteries.get(peer.id);
+      const batHtml = bat ? `<span style="font-size: 11px; opacity: 0.8;">🔋 ${bat.level}%</span>` : '';
+      const avatarContent = peer.avatar
+        ? `<img src="${peer.avatar}" alt="Avatar" class="peer-avatar-img">`
+        : getInitials(peer.name);
+
+      const div = document.createElement('div');
+      div.className = 'squad-item-card';
+      div.style.display = 'flex';
+      div.style.alignItems = 'center';
+      div.style.justifyContent = 'space-between';
+      div.style.padding = '8px 12px';
+      div.style.background = 'var(--bg-surface)';
+      div.style.border = '1px solid var(--border-divider)';
+      div.style.borderRadius = '12px';
+      div.style.cursor = 'pointer';
+
+      div.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+          <div class="peer-avatar user" style="width: 34px; height: 34px; font-size: 12.5px;">${avatarContent}</div>
+          <div style="min-width: 0;">
+            <div style="font-weight: 700; font-size: 13px; color: var(--text-primary);">${escapeHtml(peer.name)}</div>
+            <div style="font-size: 11px; color: var(--text-secondary);">${batHtml || 'Online Mesh Peer'}</div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-primary btn-sm" style="padding: 5px 12px; font-size: 12px; font-weight: 600; border-radius: 14px;">💬 Chat</button>
+      `;
+
+      div.onclick = () => {
+        closeNewDmModal();
+        selectChatTarget(peer.id);
+      };
+
+      elements.newDmPeersList.appendChild(div);
+    });
   }
 
   function sendContactRequest(targetId) {
@@ -7568,15 +7802,40 @@
   }
 
   function handleSearchInput(e) {
-    state.searchQuery = e.target.value.trim();
-    elements.btnClearSearch.style.display = state.searchQuery ? 'block' : 'none';
+    state.searchQuery = e.target.value.trim().toLowerCase();
+    if (elements.btnClearSearch) {
+      elements.btnClearSearch.style.display = state.searchQuery ? 'block' : 'none';
+    }
+    
+    // 1. Filter Channels / Rooms List in sidebar
+    if (elements.channelsList) {
+      elements.channelsList.querySelectorAll('.channel-item').forEach(item => {
+        const nameEl = item.querySelector('.channel-name');
+        const chName = nameEl ? nameEl.textContent.toLowerCase() : '';
+        if (!state.searchQuery || chName.includes(state.searchQuery)) {
+          item.style.display = 'flex';
+        } else {
+          item.style.display = 'none';
+        }
+      });
+    }
+
+    // 2. Filter Direct Messages in sidebar
+    renderPeerList(Array.from(state.peers.values()));
+
+    // 3. Filter messages in current chat view
     renderMessagesForActiveTarget();
   }
 
   function clearSearch() {
-    elements.searchInput.value = '';
+    if (elements.searchInput) elements.searchInput.value = '';
     state.searchQuery = '';
-    elements.btnClearSearch.style.display = 'none';
+    if (elements.btnClearSearch) elements.btnClearSearch.style.display = 'none';
+    
+    if (elements.channelsList) {
+      elements.channelsList.querySelectorAll('.channel-item').forEach(item => item.style.display = 'flex');
+    }
+    renderPeerList(Array.from(state.peers.values()));
     renderMessagesForActiveTarget();
   }
 
@@ -7651,14 +7910,29 @@
     // Synchronized Timer
     if (elements.btnOpenTimer) elements.btnOpenTimer.addEventListener('click', openTimerModal);
     if (elements.timerModalCloseBtn) elements.timerModalCloseBtn.addEventListener('click', () => elements.timerModalOverlay.classList.remove('active'));
-    if (elements.btnStartSyncTimer) elements.btnStartSyncTimer.addEventListener('click', () => startSyncTimer(state.sharedTimer.durationSec));
+    if (elements.btnDismissGroupTimer) elements.btnDismissGroupTimer.addEventListener('click', stopSyncTimer);
+    
+    if (elements.btnStartSyncTimer) {
+      elements.btnStartSyncTimer.addEventListener('click', () => {
+        const title = (elements.syncTimerTitleInput ? elements.syncTimerTitleInput.value.trim() : '') || 'Group Countdown';
+        let duration = state.sharedTimer.durationSec || 300;
+        if (elements.syncTimerCustomMins && elements.syncTimerCustomMins.value) {
+          const customMins = parseInt(elements.syncTimerCustomMins.value, 10);
+          if (customMins > 0) duration = customMins * 60;
+        }
+        startSyncTimer(duration, title);
+        elements.timerModalOverlay.classList.remove('active');
+      });
+    }
     if (elements.btnStopSyncTimer) elements.btnStopSyncTimer.addEventListener('click', stopSyncTimer);
 
     document.querySelectorAll('.timer-preset-btn').forEach(btn => {
       btn.addEventListener('click', () => {
+        document.querySelectorAll('.timer-preset-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        if (elements.syncTimerCustomMins) elements.syncTimerCustomMins.value = '';
         const sec = parseInt(btn.dataset.sec, 10);
         state.sharedTimer.durationSec = sec;
-        startSyncTimer(sec, btn.textContent);
       });
     });
 
@@ -7777,16 +8051,14 @@
     if (elements.btnAcceptContactReq) elements.btnAcceptContactReq.addEventListener('click', acceptContactRequest);
     if (elements.btnDeclineContactReq) elements.btnDeclineContactReq.addEventListener('click', declineContactRequest);
 
-    // Quick Templates
-    if (elements.btnQuickTemplates) elements.btnQuickTemplates.addEventListener('click', () => elements.templatesModalOverlay.classList.add('active'));
-    if (elements.templatesModalCloseBtn) elements.templatesModalCloseBtn.addEventListener('click', () => elements.templatesModalOverlay.classList.remove('active'));
-    document.querySelectorAll('.template-item-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        elements.templatesModalOverlay.classList.remove('active');
-        elements.chatMessageInput.value = btn.dataset.text;
-        elements.chatMessageInput.focus();
+    // Direct Messages & Peer Search Modal
+    if (elements.btnOpenNewDm) elements.btnOpenNewDm.addEventListener('click', openNewDmModal);
+    if (elements.newDmModalCloseBtn) elements.newDmModalCloseBtn.addEventListener('click', closeNewDmModal);
+    if (elements.newDmSearchInput) {
+      elements.newDmSearchInput.addEventListener('input', (e) => {
+        renderNewDmList(e.target.value);
       });
-    });
+    }
 
     // Polls
     if (elements.btnCreatePoll) elements.btnCreatePoll.addEventListener('click', openPollModal);
@@ -7800,6 +8072,15 @@
     document.querySelectorAll('.disappearing-opt-btn').forEach(btn => {
       btn.addEventListener('click', () => setDisappearingTimer(parseInt(btn.dataset.seconds, 10)));
     });
+
+    if (elements.btnSetCustomDisappearing && elements.disappearingCustomInput) {
+      elements.btnSetCustomDisappearing.addEventListener('click', () => {
+        const val = parseInt(elements.disappearingCustomInput.value, 10);
+        if (!isNaN(val) && val > 0) {
+          setDisappearingTimer(val);
+        }
+      });
+    }
 
     // Wallpaper & Colors
     if (elements.btnOpenWallpapers) elements.btnOpenWallpapers.addEventListener('click', openWallpaperModal);

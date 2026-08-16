@@ -1,20 +1,22 @@
 {
-  "name": "offline-mesh-chat",
-  "version": "1.0.0",
-  "description": "Zero-Internet Offline Messaging & P2P Web App for Phones & Laptops",
+  "name": "meshchat",
+  "version": "4.8.0",
+  "description": "MeshChat — Modern Online Cloud & Offline Mesh Messaging, GPS & Tactical Suite for Web, Mobile & Desktop",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js"
   },
   "keywords": [
-    "offline",
-    "mesh",
+    "meshchat",
+    "cloud",
+    "offline-mesh",
     "webrtc",
     "p2p",
     "chat",
-    "zero-internet",
-    "hotspot"
+    "gps",
+    "tactical",
+    "encryption"
   ],
   "author": "Antigravity",
   "license": "MIT",
