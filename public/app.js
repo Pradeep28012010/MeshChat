@@ -5089,11 +5089,6 @@
       return { px, py, dist, rawBearing, isOutOfBounds };
     }
 
-      const px = centerX + pixelDist * Math.cos(angleRad);
-      const py = centerY + pixelDist * Math.sin(angleRad);
-      return { px, py, dist, rawBearing };
-    }
-
     // 1. Draw 3 Concentric Radar Range Rings
     const ringFractions = [0.333, 0.666, 1.0];
     ringFractions.forEach((frac) => {
