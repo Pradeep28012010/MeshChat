@@ -5116,8 +5116,9 @@
 
     if (peersArray.length === 0) {
       elements.squadRadarList.innerHTML = `
-        <div style="text-align: center; padding: 20px; color: var(--text-secondary); font-size: 13px;">
-          No other peers connected to mesh. Share the URL or hotspot to connect squad devices.
+        <div style="text-align: center; padding: 28px 16px; color: var(--text-secondary); font-size: 13px; background: rgba(255,255,255,0.02); border-radius: 12px; border: 1px dashed rgba(255,255,255,0.1);">
+          📡 <strong>No squad peers currently connected</strong><br>
+          <span style="font-size: 11.5px; opacity: 0.7; margin-top: 4px; display: inline-block;">Connect another device over the same Wi-Fi / Hotspot to track real-time positions.</span>
         </div>
       `;
       return;
@@ -5140,16 +5141,19 @@
       const card = document.createElement('div');
       card.className = 'squad-item-card';
       card.innerHTML = `
+        <div style="width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #007aff, #0056b3); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex-shrink: 0; box-shadow: 0 2px 8px rgba(0,122,255,0.3);">
+          ${getInitials(peer.name)}
+        </div>
         <div class="squad-item-meta">
           <div class="squad-item-name">
             <span>${escapeHtml(peer.name)}</span>
-            <span style="font-size: 10px; color: #34c759; font-weight: 500;">● Online</span>
+            <span class="squad-online-badge">● Online</span>
           </div>
           <div class="squad-item-sub">${distStr} ${bearingStr}</div>
         </div>
         <div class="squad-item-actions">
-          ${loc && loc.coords ? `<button type="button" class="btn btn-secondary btn-sm btn-guide-peer" data-peer-id="${peer.id}" style="padding: 4px 8px; font-size: 11px;">🎯 Guide</button>` : ''}
-          <button type="button" class="btn btn-primary btn-sm btn-chat-peer" data-peer-id="${peer.id}" style="padding: 4px 8px; font-size: 11px;">💬 Chat</button>
+          ${loc && loc.coords ? `<button type="button" class="btn-tactical-guide btn-guide-peer" data-peer-id="${peer.id}">🎯 Guide</button>` : ''}
+          <button type="button" class="btn-tactical-chat btn-chat-peer" data-peer-id="${peer.id}">💬 Chat</button>
         </div>
       `;
 
@@ -5183,8 +5187,9 @@
 
     if (state.waypoints.length === 0) {
       elements.waypointsVaultList.innerHTML = `
-        <div style="text-align: center; padding: 20px; color: var(--text-secondary); font-size: 13px;">
-          No waypoints pinned. Tap <strong>+ New Waypoint</strong> to drop tactical markers for the mesh.
+        <div style="text-align: center; padding: 28px 16px; color: var(--text-secondary); font-size: 13px; background: rgba(255,255,255,0.02); border-radius: 12px; border: 1px dashed rgba(255,255,255,0.1);">
+          📍 <strong>No waypoints pinned</strong><br>
+          <span style="font-size: 11.5px; opacity: 0.7; margin-top: 4px; display: inline-block;">Tap <strong>+ New Waypoint</strong> above to pin tactical positions for your team.</span>
         </div>
       `;
       return;
@@ -5201,17 +5206,19 @@
       const card = document.createElement('div');
       card.className = 'waypoint-item-card';
       card.innerHTML = `
+        <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0;">
+          ${wp.icon || '📍'}
+        </div>
         <div class="waypoint-item-meta">
           <div class="waypoint-item-name">
-            <span>${wp.icon || '📍'}</span>
             <span>${escapeHtml(wp.name)}</span>
           </div>
           <div class="waypoint-item-sub">${distStr} • ${cardDir} • ${wp.lat.toFixed(4)}, ${wp.lon.toFixed(4)}</div>
         </div>
         <div class="waypoint-item-actions">
-          <button type="button" class="btn btn-secondary btn-sm btn-guide-wp" style="padding: 4px 8px; font-size: 11px;" title="Guide heading arrow to waypoint">🎯</button>
-          <button type="button" class="btn btn-secondary btn-sm btn-share-wp" style="padding: 4px 8px; font-size: 11px;" title="Share waypoint in chat">📤</button>
-          <button type="button" class="btn btn-secondary btn-sm btn-delete-wp" style="padding: 4px 8px; font-size: 11px; color: #ff3b30;" title="Delete waypoint">🗑️</button>
+          <button type="button" class="btn-tactical-icon btn-guide-wp" title="Guide heading arrow to waypoint">🎯</button>
+          <button type="button" class="btn-tactical-icon btn-share-wp" title="Share waypoint into chat">📤</button>
+          <button type="button" class="btn-tactical-icon danger btn-delete-wp" title="Delete waypoint">🗑️</button>
         </div>
       `;
 

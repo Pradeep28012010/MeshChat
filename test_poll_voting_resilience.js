@@ -20,10 +20,16 @@ async function runPollTestSuite() {
     shell: false
   });
 
-  serverProcess.stdout.on('data', d => process.stdout.write('[Server] ' + d));
-  serverProcess.stderr.on('data', d => process.stderr.write('[Server ERR] ' + d));
+  await new Promise((resolve) => {
+    serverProcess.stdout.on('data', d => {
+      process.stdout.write('[Server] ' + d);
+      if (d.toString().includes('MESHCAT SERVER STARTED')) resolve();
+    });
+    serverProcess.stderr.on('data', d => process.stderr.write('[Server ERR] ' + d));
+    setTimeout(resolve, 3500);
+  });
 
-  await sleep(2500);
+  await sleep(500);
 
   // Connect Alice
   const clientAlice = new WebSocket(WS_URL);
