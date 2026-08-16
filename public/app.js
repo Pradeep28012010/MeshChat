@@ -2788,14 +2788,16 @@
     const msg = state.messages.find(m => m.id === pollId);
     if (!msg || !msg.options || !msg.options[optionIndex]) return;
 
+    const currentOpt = msg.options[optionIndex];
+    if (!currentOpt.voters) currentOpt.voters = [];
+    const alreadyVotedThis = currentOpt.voters.includes(state.self.id) || currentOpt.voters.includes(state.self.name);
+    const action = alreadyVotedThis ? 'remove' : 'vote';
+
     msg.options.forEach((opt, idx) => {
       if (!opt.voters) opt.voters = [];
-      const userIdx = opt.voters.indexOf(state.self.id);
-      if (idx === optionIndex) {
-        if (userIdx === -1) opt.voters.push(state.self.id);
-        else opt.voters.splice(userIdx, 1);
-      } else {
-        if (userIdx !== -1) opt.voters.splice(userIdx, 1);
+      opt.voters = opt.voters.filter(v => v !== state.self.id && v !== state.self.name);
+      if (idx === optionIndex && action !== 'remove') {
+        opt.voters.push(state.self.id);
       }
     });
 
@@ -2809,6 +2811,8 @@
         type: 'POLL_VOTE',
         pollId: pollId,
         optionIndex: optionIndex,
+        options: msg.options,
+        action: action,
         voterId: state.self.id,
         voterName: state.self.name
       }));
@@ -2817,19 +2821,22 @@
 
   function handleIncomingPollVote(data) {
     const msg = state.messages.find(m => m.id === data.pollId);
-    if (!msg || !msg.options || !msg.options[data.optionIndex]) return;
-    const voter = data.voterId || data.voterName;
+    if (!msg || !msg.options) return;
 
-    msg.options.forEach((opt, idx) => {
-      if (!opt.voters) opt.voters = [];
-      const userIdx = opt.voters.indexOf(voter);
-      if (idx === data.optionIndex) {
-        if (userIdx === -1) opt.voters.push(voter);
-        else opt.voters.splice(userIdx, 1);
-      } else {
-        if (userIdx !== -1) opt.voters.splice(userIdx, 1);
-      }
-    });
+    if (Array.isArray(data.options)) {
+      msg.options = data.options;
+    } else {
+      const voter = data.voterId || data.voterName;
+      if (!voter) return;
+
+      msg.options.forEach((opt, idx) => {
+        if (!opt.voters) opt.voters = [];
+        opt.voters = opt.voters.filter(v => v !== voter);
+        if (idx === data.optionIndex && data.action !== 'remove') {
+          opt.voters.push(voter);
+        }
+      });
+    }
 
     saveMessageToStorage(msg);
     if (shouldDisplayMessage(msg)) {

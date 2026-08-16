@@ -445,14 +445,15 @@ wss.on('connection', (ws, req) => {
         // Live Polls & Group Voting
         case 'POLL_VOTE': {
           const pollMsg = sessionMessages.find(m => m.id === data.pollId);
+          const voter = data.voterId || currentPeerId;
+          const action = data.action || 'vote';
+
           if (pollMsg && pollMsg.options) {
             pollMsg.options.forEach((opt, idx) => {
               if (!opt.voters) opt.voters = [];
-              const uIdx = opt.voters.indexOf(currentPeerId);
-              if (idx === data.optionIndex) {
-                if (uIdx === -1) opt.voters.push(currentPeerId);
-              } else {
-                if (uIdx !== -1) opt.voters.splice(uIdx, 1);
+              opt.voters = opt.voters.filter(v => v !== voter);
+              if (idx === data.optionIndex && action !== 'remove') {
+                opt.voters.push(voter);
               }
             });
             saveMessagesToDisk();
@@ -462,7 +463,9 @@ wss.on('connection', (ws, req) => {
             type: 'POLL_VOTE',
             pollId: data.pollId,
             optionIndex: data.optionIndex,
-            voterId: currentPeerId,
+            options: pollMsg ? pollMsg.options : data.options,
+            action: action,
+            voterId: voter,
             voterName: data.voterName || 'User'
           });
           break;
