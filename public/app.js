@@ -382,10 +382,7 @@
     activeTargetId: 'broadcast',
     activeChannelId: localStorage.getItem('mesh_active_channel') || 'general',
     channels: JSON.parse(localStorage.getItem('mesh_channels') || 'null') || [
-      { id: 'general', name: 'general' },
-      { id: 'study-group', name: 'study-group' },
-      { id: 'gaming', name: 'gaming' },
-      { id: 'photos', name: 'photos-media' }
+      { id: 'general', name: 'general', isPrivate: false }
     ],
 
     // Collaborative Notes (Context-Specific)
@@ -2456,6 +2453,10 @@
     const btnDelEveryone = document.getElementById('ctx-action-delete-everyone');
     if (btnDelEveryone) btnDelEveryone.style.display = isSelf ? 'flex' : 'none';
 
+    const isPinned = state.pinnedMessage && state.pinnedMessage.id === msgId;
+    const pinLabel = document.getElementById('ctx-pin-label');
+    if (pinLabel) pinLabel.textContent = isPinned ? 'Unpin Announcement' : 'Pin Announcement';
+
     const starLabel = document.getElementById('ctx-star-label');
     if (starLabel) starLabel.textContent = isStarred ? 'Unstar Message' : 'Star Message';
 
@@ -3204,6 +3205,19 @@
   }
 
   // --- 24. 📌 Pinned Announcement Banner ---
+  function pinMessage(messageId) {
+    const msg = state.messages.find(m => m.id === messageId);
+    if (msg) {
+      if (state.pinnedMessage && state.pinnedMessage.id === msg.id) {
+        unpinMessage();
+        showNotificationToast('📌 Announcement unpinned.');
+      } else {
+        pinMessageToTop(msg);
+        showNotificationToast('📌 Message pinned to announcement banner!');
+      }
+    }
+  }
+
   function pinMessageToTop(msg) {
     state.pinnedMessage = msg;
     localStorage.setItem('mesh_pinned_msg', JSON.stringify(msg));

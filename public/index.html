@@ -10,7 +10,7 @@
   <link rel="manifest" href="./manifest.json">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <link rel="stylesheet" href="./styles.css?v=4.5">
+  <link rel="stylesheet" href="./styles.css?v=4.6">
   <title>MeshChat — Online Cloud & Offline Mesh Suite</title>
 </head>
 <body>
@@ -149,18 +149,6 @@
         <div class="channel-item active" data-channel-id="general">
           <span class="channel-hash">#</span>
           <span class="channel-name">general</span>
-        </div>
-        <div class="channel-item" data-channel-id="study-group">
-          <span class="channel-hash">#</span>
-          <span class="channel-name">study-group</span>
-        </div>
-        <div class="channel-item" data-channel-id="gaming">
-          <span class="channel-hash">#</span>
-          <span class="channel-name">gaming</span>
-        </div>
-        <div class="channel-item" data-channel-id="photos">
-          <span class="channel-hash">#</span>
-          <span class="channel-name">photos-media</span>
         </div>
       </div>
 
@@ -1902,7 +1890,7 @@
       </button>
       <button type="button" class="ctx-menu-item" id="ctx-action-pin">
         <span class="ctx-icon">📌</span>
-        <span>Pin Announcement</span>
+        <span id="ctx-pin-label">Pin Announcement</span>
       </button>
       <button type="button" class="ctx-menu-item" id="ctx-action-star">
         <span class="ctx-icon">⭐</span>
@@ -1924,6 +1912,6 @@
     </div>
   </div>
 
-  <script src="./app.js?v=4.5"></script>
+  <script src="./app.js?v=4.6"></script>
 </body>
 </html>
