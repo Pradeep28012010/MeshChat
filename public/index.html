@@ -10,7 +10,7 @@
   <link rel="manifest" href="./manifest.json">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <link rel="stylesheet" href="./styles.css?v=4.6">
+  <link rel="stylesheet" href="./styles.css?v=4.7">
   <title>MeshChat — Online Cloud & Offline Mesh Suite</title>
 </head>
 <body>
@@ -1743,7 +1743,7 @@
 
   <!-- 👤 User Profile, Status & Location Calibration Modal -->
   <div class="modal-overlay" id="profile-modal-overlay">
-    <div class="modal-card tactical-modal-card" style="max-width: 480px;">
+    <div class="modal-card tactical-modal-card" style="max-width: 440px;">
       <div class="modal-header">
         <div>
           <h3 class="modal-title">👤 Profile & Field Status</h3>
@@ -1752,9 +1752,9 @@
         <button class="close-btn" id="profile-modal-close-btn">&times;</button>
       </div>
 
-      <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 18px;">
-        <div class="self-avatar-wrap" id="modal-avatar-wrap" style="width: 72px; height: 72px; cursor: pointer;" title="Click to change profile picture">
-          <div class="peer-avatar user" id="modal-avatar-preview" style="width: 72px; height: 72px; font-size: 24px;">U</div>
+      <div style="display: flex; flex-direction: column; align-items: center; margin: 8px 0 18px;">
+        <div class="self-avatar-wrap" id="modal-avatar-wrap" style="width: 76px; height: 76px; cursor: pointer; position: relative;" title="Click to change profile picture">
+          <div class="peer-avatar user" id="modal-avatar-preview" style="width: 76px; height: 76px; font-size: 26px; border-radius: 50%;">U</div>
           <div class="avatar-camera-overlay">📷</div>
         </div>
         <span style="font-size: 11.5px; color: var(--text-secondary); margin-top: 6px;">Tap avatar to upload photo</span>
@@ -1762,12 +1762,12 @@
 
       <div class="field-group" style="margin-bottom: 14px;">
         <label class="ip-section-label">Display Name:</label>
-        <input type="text" class="input-text" id="modal-profile-name-input" placeholder="Your Name" style="width: 100%; padding: 10px 12px; border-radius: 10px; font-size: 13.5px;">
+        <input type="text" class="input-text" id="modal-profile-name-input" placeholder="Your Name" style="width: 100%; padding: 10px 14px; border-radius: 12px; font-size: 13.5px; background: var(--bg-app); color: var(--text-primary); border: 1px solid var(--border-divider);">
       </div>
 
       <div class="field-group" style="margin-bottom: 14px;">
         <label class="ip-section-label">Field Status Beacon:</label>
-        <select class="input-text" id="modal-status-beacon" style="width: 100%; padding: 10px 12px; border-radius: 10px; font-size: 13px; background: var(--bg-surface-secondary); color: var(--text-primary);">
+        <select class="input-text" id="modal-status-beacon" style="width: 100%; padding: 10px 14px; border-radius: 12px; font-size: 13px; background: var(--bg-app); color: var(--text-primary); border: 1px solid var(--border-divider);">
           <option value="🟢 Active & Online">🟢 Active & Online</option>
           <option value="🏕️ In Field / Tactical">🏕️ In Field / Tactical</option>
           <option value="🔕 Do Not Disturb">🔕 Do Not Disturb</option>
@@ -1777,15 +1777,15 @@
 
       <div class="field-group" style="margin-bottom: 18px;">
         <label class="ip-section-label">📍 GPS Coordinates & Accuracy:</label>
-        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px;">
-          <div id="modal-gps-coords-text" style="font-size: 12px; font-family: var(--font-mono); color: #38bdf8; margin-bottom: 8px;">
+        <div style="background: var(--bg-app); border: 1px solid var(--border-divider); border-radius: 12px; padding: 12px;">
+          <div id="modal-gps-coords-text" style="font-size: 12px; font-family: var(--font-mono); color: var(--accent-blue); font-weight: 600; margin-bottom: 8px;">
             Coords: 17.3850°, 78.4867° • Accuracy: ±10m
           </div>
-          <button type="button" class="btn btn-secondary btn-sm" id="btn-modal-recalibrate-gps" style="width: 100%; padding: 8px; font-size: 12px;">🛰️ Acquire Exact GPS Fix</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-modal-recalibrate-gps" style="width: 100%; padding: 9px; font-size: 12px; font-weight: 600;">🛰️ Acquire Exact GPS Fix</button>
         </div>
       </div>
 
-      <button type="button" class="btn btn-primary" id="btn-save-profile-modal" style="width: 100%; padding: 12px; font-size: 13.5px; font-weight: 700; border-radius: 10px;">Save Profile</button>
+      <button type="button" class="btn btn-primary" id="btn-save-profile-modal" style="width: 100%; padding: 12px; font-size: 13.5px; font-weight: 700; border-radius: 12px;">Save Profile</button>
     </div>
   </div>
 
@@ -1912,6 +1912,6 @@
     </div>
   </div>
 
-  <script src="./app.js?v=4.6"></script>
+  <script src="./app.js?v=4.7"></script>
 </body>
 </html>

@@ -1659,26 +1659,38 @@ body.dark-theme .peer-avatar {
   letter-spacing: 0.4px;
 }
 
-/* --- Tactical Command Center Modal & Tabs --- */
+/* --- Tactical Command Center & Adaptive Modals --- */
 .tactical-modal-card {
   max-width: 520px;
   width: 92%;
-  background: rgba(18, 24, 38, 0.94) !important;
+  background: var(--bg-surface) !important;
+  color: var(--text-primary) !important;
   backdrop-filter: blur(24px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  border: 1px solid var(--border-divider) !important;
   border-radius: 20px !important;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(0, 122, 255, 0.15) !important;
+  box-shadow: var(--shadow-modal) !important;
   padding: 22px !important;
+}
+
+body.dark-theme .tactical-modal-card {
+  background: rgba(21, 24, 33, 0.96) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(0, 122, 255, 0.15) !important;
 }
 
 .tactical-tab-bar, .poll-choice-selector {
   display: flex;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-app);
+  border: 1px solid var(--border-divider);
   border-radius: 12px;
   padding: 4px;
   gap: 4px;
   margin-bottom: 16px;
+}
+
+body.dark-theme .tactical-tab-bar, body.dark-theme .poll-choice-selector {
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .tactical-tab-btn, .poll-choice-btn {
@@ -1687,7 +1699,7 @@ body.dark-theme .peer-avatar {
   border-radius: 8px;
   border: none;
   background: transparent;
-  color: #94a3b8;
+  color: var(--text-secondary);
   font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
@@ -1699,20 +1711,25 @@ body.dark-theme .peer-avatar {
 }
 
 .tactical-tab-btn:hover, .poll-choice-btn:hover {
+  color: var(--text-primary);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+body.dark-theme .tactical-tab-btn:hover, body.dark-theme .poll-choice-btn:hover {
   color: #f1f5f9;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .tactical-tab-btn.active, .poll-choice-btn.active {
-  background: #007aff;
+  background: var(--accent-blue);
   color: #ffffff;
-  box-shadow: 0 2px 10px rgba(0, 122, 255, 0.4);
+  box-shadow: 0 2px 10px rgba(0, 122, 255, 0.35);
 }
 
 /* --- Squad & Waypoint Item Cards --- */
 .squad-item-card, .waypoint-item-card {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-app);
+  border: 1px solid var(--border-divider);
   border-radius: 14px;
   padding: 12px 16px;
   display: flex;
@@ -1722,10 +1739,15 @@ body.dark-theme .peer-avatar {
   transition: all 0.2s ease;
 }
 
+body.dark-theme .squad-item-card, body.dark-theme .waypoint-item-card {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
 .squad-item-card:hover, .waypoint-item-card:hover {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(0, 122, 255, 0.3);
+  border-color: var(--accent-blue);
   transform: translateY(-1px);
+  box-shadow: var(--shadow-card);
 }
 
 .squad-item-meta, .waypoint-item-meta {
@@ -1737,7 +1759,7 @@ body.dark-theme .peer-avatar {
 .squad-item-name, .waypoint-item-name {
   font-size: 13.5px;
   font-weight: 700;
-  color: #f8fafc;
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1754,7 +1776,7 @@ body.dark-theme .peer-avatar {
 
 .squad-item-sub, .waypoint-item-sub {
   font-size: 11.5px;
-  color: #38bdf8;
+  color: var(--accent-blue);
   font-family: var(--font-mono);
   font-weight: 500;
   margin-top: 3px;
@@ -1767,9 +1789,9 @@ body.dark-theme .peer-avatar {
 }
 
 .btn-tactical-guide {
-  background: rgba(0, 122, 255, 0.15) !important;
-  color: #38bdf8 !important;
-  border: 1px solid rgba(0, 122, 255, 0.35) !important;
+  background: rgba(0, 122, 255, 0.12) !important;
+  color: var(--accent-blue) !important;
+  border: 1px solid rgba(0, 122, 255, 0.25) !important;
   padding: 6px 12px !important;
   border-radius: 8px !important;
   font-size: 12px !important;
@@ -1779,12 +1801,12 @@ body.dark-theme .peer-avatar {
 }
 
 .btn-tactical-guide:hover {
-  background: rgba(0, 122, 255, 0.3) !important;
+  background: rgba(0, 122, 255, 0.22) !important;
   transform: scale(1.04);
 }
 
 .btn-tactical-chat {
-  background: #007aff !important;
+  background: var(--accent-blue) !important;
   color: #ffffff !important;
   border: none !important;
   padding: 6px 14px !important;
@@ -1797,14 +1819,14 @@ body.dark-theme .peer-avatar {
 }
 
 .btn-tactical-chat:hover {
-  background: #0062cc !important;
+  background: var(--accent-blue-hover) !important;
   transform: scale(1.04);
 }
 
 .btn-tactical-icon {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #f1f5f9;
+  background: var(--bg-app);
+  border: 1px solid var(--border-divider);
+  color: var(--text-primary);
   width: 32px;
   height: 32px;
   border-radius: 8px;
@@ -1816,8 +1838,15 @@ body.dark-theme .peer-avatar {
   transition: all 0.15s ease;
 }
 
+body.dark-theme .btn-tactical-icon {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #f1f5f9;
+}
+
 .btn-tactical-icon:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--accent-blue-tint);
+  border-color: var(--accent-blue);
   transform: scale(1.08);
 }
 
@@ -1826,8 +1855,8 @@ body.dark-theme .peer-avatar {
 }
 
 .btn-tactical-icon.danger:hover {
-  background: rgba(255, 59, 48, 0.15);
-  border-color: rgba(255, 59, 48, 0.4);
+  background: rgba(255, 59, 48, 0.12);
+  border-color: rgba(255, 59, 48, 0.35);
 }
 
 /* 3. Walkie-Talkie Push-to-Talk (PTT) View */
