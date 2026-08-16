@@ -1,4 +1,4 @@
-const CACHE_NAME = 'meshchat-v4.1-live';
+const CACHE_NAME = 'meshchat-v4.2-live';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -42,12 +42,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Network-First Strategy for all HTML, CSS, JS and static assets
+  // Network-First Strategy for all HTML, CSS, JS, CDN and static assets
   // Guarantees latest version on refresh, while preserving 100% offline fallback
   event.respondWith(
     fetch(event.request)
       .then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+        if (networkResponse && networkResponse.status === 200 && (networkResponse.type === 'basic' || networkResponse.type === 'cors')) {
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(event.request, responseToCache);

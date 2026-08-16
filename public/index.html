@@ -8,7 +8,9 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="description" content="Zero-Internet Offline Messaging, Calling, GPS Map, Walkie-Talkie & Survival Suite">
   <link rel="manifest" href="./manifest.json">
-  <link rel="stylesheet" href="./styles.css?v=4.1">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <link rel="stylesheet" href="./styles.css?v=4.2">
   <title>MeshChat — Online Cloud & Offline Mesh Suite</title>
 </head>
 <body>
@@ -384,6 +386,7 @@
           <span class="stat-value" id="map-coords-stat" title="Click to toggle DD / DMS format" style="cursor: pointer;">17.3850°, 78.4867°</span>
         </div>
         <div class="map-actions-group">
+          <button type="button" class="btn btn-secondary" id="btn-toggle-map-mode" style="padding: 4px 10px; font-size: 11.5px;" title="Switch between Online Streets, Satellite & Tactical Radar">🗺️ Mode: Auto</button>
           <button type="button" class="btn btn-secondary" id="btn-open-squad-drawer" style="padding: 4px 10px; font-size: 11.5px;">👥 Squad</button>
           <button type="button" class="btn btn-secondary" id="btn-open-waypoints-vault" style="padding: 4px 10px; font-size: 11.5px;">📍 Waypoints</button>
           <button type="button" class="btn btn-secondary" id="btn-toggle-radar-sweep" style="padding: 4px 10px; font-size: 11.5px;">📡 Sweep: ON</button>
@@ -434,8 +437,12 @@
         </div>
       </div>
 
-      <div class="map-canvas-container">
-        <canvas id="offline-map-canvas"></canvas>
+      <div class="map-canvas-container" style="position: relative; width: 100%; height: 100%; overflow: hidden;">
+        <!-- 🌐 Online Interactive GPS Street & Satellite Map (Leaflet) -->
+        <div id="online-leaflet-map" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0; display: none; z-index: 1;"></div>
+        
+        <!-- 📡 Zero-Internet Tactical Vector Radar (Canvas) -->
+        <canvas id="offline-map-canvas" style="position: absolute; top: 0; left: 0; z-index: 2;"></canvas>
         
         <!-- Rangefinder & Azimuth HUD overlay -->
         <div class="map-hud-overlay-tag" id="map-hud-range-tag">RANGE: 300m • AZIMUTH: 360° BEZEL</div>
@@ -1910,6 +1917,6 @@
     </div>
   </div>
 
-  <script src="./app.js?v=4.1"></script>
+  <script src="./app.js?v=4.2"></script>
 </body>
 </html>

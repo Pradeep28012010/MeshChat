@@ -914,7 +914,8 @@
     btnCloseMapPeerCard: document.getElementById('btn-close-map-peer-card'),
     btnMapChatPeer: document.getElementById('btn-map-chat-peer'),
     btnMapGuidePeer: document.getElementById('btn-map-guide-peer'),
-    btnMapCallPeer: document.getElementById('btn-map-call-peer'),
+    onlineLeafletMap: document.getElementById('online-leaflet-map'),
+    btnToggleMapMode: document.getElementById('btn-toggle-map-mode'),
     mapHudRangeTag: document.getElementById('map-hud-range-tag'),
     btnMapZoomIn: document.getElementById('btn-map-zoom-in'),
     btnMapZoomOut: document.getElementById('btn-map-zoom-out'),
@@ -4505,6 +4506,18 @@
   let drawnWaypointHitboxes = [];
   let radarAnimFrameId = null;
 
+  // Leaflet Online Map State
+  let leafletMap = null;
+  let leafletTileLayer = null;
+  let leafletSelfMarker = null;
+  let leafletPeerMarkers = new Map();
+  let leafletWaypointMarkers = new Map();
+  let leafletTrailPolyline = null;
+  let leafletFlareMarkers = [];
+
+  // Map Modes: 'auto' | 'streets' | 'satellite' | 'radar'
+  state.mapMode = localStorage.getItem('mesh_map_mode') || 'auto';
+
   function hashStringToNumber(str) {
     if (!str) return 42;
     let hash = 0;
@@ -4557,6 +4570,229 @@
     return `${lat.toFixed(4)}°, ${lon.toFixed(4)}°`;
   }
 
+  // --- Online Leaflet GPS Map Engine ---
+  function initLeafletMap() {
+    if (!window.L || !elements.onlineLeafletMap) return;
+    if (leafletMap) return;
+
+    try {
+      const initLat = state.myCoords ? state.myCoords.latitude : 17.3850;
+      const initLon = state.myCoords ? state.myCoords.longitude : 78.4867;
+
+      leafletMap = L.map('online-leaflet-map', {
+        center: [initLat, initLon],
+        zoom: 16,
+        zoomControl: false,
+        attributionControl: false
+      });
+
+      setLeafletTileLayer(state.mapMode === 'satellite' ? 'satellite' : 'streets');
+
+      // Click on Online Map to Drop Waypoint Pin
+      leafletMap.on('click', (e) => {
+        if (elements.wpLatInput && elements.wpLonInput) {
+          elements.wpLatInput.value = e.latlng.lat.toFixed(6);
+          elements.wpLonInput.value = e.latlng.lng.toFixed(6);
+          openWaypointModal();
+        }
+      });
+    } catch (e) {
+      console.warn('[Leaflet] Init error:', e);
+    }
+  }
+
+  function setLeafletTileLayer(layerType) {
+    if (!leafletMap || !window.L) return;
+    if (leafletTileLayer) leafletMap.removeLayer(leafletTileLayer);
+
+    if (layerType === 'satellite') {
+      leafletTileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 19
+      }).addTo(leafletMap);
+    } else {
+      const isDark = document.body.classList.contains('dark-theme') || document.body.classList.contains('red-vision-theme');
+      const tileUrl = isDark
+        ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+        : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+
+      leafletTileLayer = L.tileLayer(tileUrl, {
+        subdomains: 'abcd',
+        maxZoom: 20
+      }).addTo(leafletMap);
+    }
+  }
+
+  function updateMapDisplayMode() {
+    const isOnline = navigator.onLine && window.L;
+    let active = state.mapMode;
+
+    if (active === 'auto') {
+      active = isOnline ? 'streets' : 'radar';
+    }
+
+    if (active === 'streets' || active === 'satellite') {
+      if (elements.onlineLeafletMap) elements.onlineLeafletMap.style.display = 'block';
+      if (elements.offlineMapCanvas) elements.offlineMapCanvas.style.display = 'none';
+      if (elements.mapHudRangeTag) elements.mapHudRangeTag.style.display = 'none';
+
+      if (!leafletMap) initLeafletMap();
+      setLeafletTileLayer(active);
+      setTimeout(() => {
+        if (leafletMap) {
+          leafletMap.invalidateSize();
+          syncLeafletMarkers();
+        }
+      }, 50);
+
+      if (elements.btnToggleMapMode) {
+        const modeLabel = state.mapMode === 'auto'
+          ? (active === 'satellite' ? '🗺️ Auto (🛰️ Sat)' : '🗺️ Auto (🌐 Streets)')
+          : (active === 'satellite' ? '🛰️ Satellite Map' : '🌐 Online Streets');
+        elements.btnToggleMapMode.textContent = modeLabel;
+      }
+    } else {
+      // Offline Radar Mode
+      if (elements.onlineLeafletMap) elements.onlineLeafletMap.style.display = 'none';
+      if (elements.offlineMapCanvas) elements.offlineMapCanvas.style.display = 'block';
+      if (elements.mapHudRangeTag) elements.mapHudRangeTag.style.display = 'block';
+
+      if (elements.btnToggleMapMode) {
+        elements.btnToggleMapMode.textContent = state.mapMode === 'auto' ? '🗺️ Auto (📡 Radar)' : '📡 Tactical Radar';
+      }
+      resizeAndDrawMap();
+    }
+  }
+
+  function toggleMapMode() {
+    if (state.mapMode === 'auto') state.mapMode = 'streets';
+    else if (state.mapMode === 'streets') state.mapMode = 'satellite';
+    else if (state.mapMode === 'satellite') state.mapMode = 'radar';
+    else state.mapMode = 'auto';
+
+    localStorage.setItem('mesh_map_mode', state.mapMode);
+    updateMapDisplayMode();
+
+    const modeLabels = {
+      auto: '🤖 Auto (Smart Detect: Online Streets ⇄ Offline Radar)',
+      streets: '🌐 Online GPS Street Map (Leaflet / OSM)',
+      satellite: '🛰️ High-Resolution Satellite View',
+      radar: '📡 Zero-Internet Tactical Vector Radar'
+    };
+    showNotificationToast(`Map Mode: ${modeLabels[state.mapMode] || state.mapMode}`);
+  }
+
+  function syncLeafletMarkers() {
+    if (!leafletMap || !window.L) return;
+
+    const myLat = state.myCoords ? state.myCoords.latitude : 17.3850;
+    const myLon = state.myCoords ? state.myCoords.longitude : 78.4867;
+
+    // 1. Self Marker
+    const selfIconHtml = `
+      <div class="leaflet-self-beacon">
+        <div class="leaflet-pulse-ring"></div>
+        <div class="leaflet-beacon-dot">${state.self.avatar ? `<img src="${state.self.avatar}">` : getInitials(state.self.name)}</div>
+      </div>
+    `;
+    const selfIcon = L.divIcon({
+      className: 'leaflet-custom-div-icon',
+      html: selfIconHtml,
+      iconSize: [36, 36],
+      iconAnchor: [18, 18]
+    });
+
+    if (leafletSelfMarker) {
+      leafletSelfMarker.setLatLng([myLat, myLon]);
+      leafletSelfMarker.setIcon(selfIcon);
+    } else {
+      leafletSelfMarker = L.marker([myLat, myLon], { icon: selfIcon }).addTo(leafletMap);
+      leafletSelfMarker.bindPopup(`<b>You (${escapeHtml(state.self.name)})</b><br>Lat: ${myLat.toFixed(5)}<br>Lon: ${myLon.toFixed(5)}`);
+    }
+
+    // 2. Peer Markers
+    state.peerLocations.forEach((peer, peerId) => {
+      if (peerId === state.self.id || !peer.coords) return;
+      const pLat = peer.coords.latitude;
+      const pLon = peer.coords.longitude;
+      const dist = calculateDistance(myLat, myLon, pLat, pLon);
+      const bearing = calculateBearing(myLat, myLon, pLat, pLon);
+
+      const peerIconHtml = `
+        <div class="leaflet-peer-beacon">
+          <div class="leaflet-pulse-ring peer"></div>
+          <div class="leaflet-beacon-dot peer">${peer.avatar ? `<img src="${peer.avatar}">` : getInitials(peer.name)}</div>
+          <div class="leaflet-beacon-label">${escapeHtml(peer.name)}</div>
+        </div>
+      `;
+      const peerIcon = L.divIcon({
+        className: 'leaflet-custom-div-icon',
+        html: peerIconHtml,
+        iconSize: [36, 36],
+        iconAnchor: [18, 18]
+      });
+
+      let marker = leafletPeerMarkers.get(peerId);
+      if (marker) {
+        marker.setLatLng([pLat, pLon]);
+        marker.setIcon(peerIcon);
+      } else {
+        marker = L.marker([pLat, pLon], { icon: peerIcon }).addTo(leafletMap);
+        leafletPeerMarkers.set(peerId, marker);
+      }
+      marker.bindPopup(`
+        <div style="min-width: 140px;">
+          <b>${escapeHtml(peer.name)}</b>
+          <div style="font-size: 11px; opacity: 0.8; margin: 4px 0;">📍 ${dist} (${bearing})</div>
+          <button type="button" class="btn btn-primary btn-sm" onclick="selectChatTarget('${peerId}'); switchView('chat');" style="width: 100%; padding: 4px 8px; font-size: 11px; margin-top: 4px;">💬 Chat</button>
+        </div>
+      `);
+    });
+
+    // 3. Waypoints
+    state.waypoints.forEach(wp => {
+      const wpIconHtml = `
+        <div class="leaflet-wp-badge">
+          <span>${wp.icon || '📍'}</span>
+          <div class="leaflet-wp-label">${escapeHtml(wp.name)}</div>
+        </div>
+      `;
+      const wpIcon = L.divIcon({
+        className: 'leaflet-custom-div-icon',
+        html: wpIconHtml,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14]
+      });
+
+      let marker = leafletWaypointMarkers.get(wp.id);
+      if (marker) {
+        marker.setLatLng([wp.lat, wp.lon]);
+        marker.setIcon(wpIcon);
+      } else {
+        marker = L.marker([wp.lat, wp.lon], { icon: wpIcon }).addTo(leafletMap);
+        leafletWaypointMarkers.set(wp.id, marker);
+      }
+      marker.bindPopup(`
+        <b>${wp.icon || '📍'} ${escapeHtml(wp.name)}</b>
+        <div style="font-size: 11px; margin-top: 2px;">${wp.lat.toFixed(5)}, ${wp.lon.toFixed(5)}</div>
+      `);
+    });
+
+    // 4. Breadcrumb Trail Polyline
+    if (state.myTrail && state.myTrail.length > 1) {
+      const latlngs = state.myTrail.map(pt => [pt.lat, pt.lon]);
+      if (leafletTrailPolyline) {
+        leafletTrailPolyline.setLatLngs(latlngs);
+      } else {
+        leafletTrailPolyline = L.polyline(latlngs, {
+          color: '#007aff',
+          weight: 3,
+          opacity: 0.8,
+          dashArray: '6, 6'
+        }).addTo(leafletMap);
+      }
+    }
+  }
+
   function initMapEngine() {
     if (elements.offlineMapCanvas) {
       mapCanvasCtx = elements.offlineMapCanvas.getContext('2d');
@@ -4564,13 +4800,14 @@
     acquireGpsPosition(false);
     initMapEventListeners();
     startRadarSweepAnimation();
+    updateMapDisplayMode();
   }
 
   function startRadarSweepAnimation() {
     if (radarAnimFrameId) cancelAnimationFrame(radarAnimFrameId);
 
     const sweepStep = () => {
-      if (state.activeView === 'map' && state.radarSweepEnabled) {
+      if (state.activeView === 'map' && state.radarSweepEnabled && elements.offlineMapCanvas.style.display !== 'none') {
         state.radarSweepAngle = (state.radarSweepAngle + 1.2) % 360;
         drawMap();
       }
@@ -5088,11 +5325,33 @@
   }
 
   function initMapEventListeners() {
+    if (elements.btnToggleMapMode) {
+      elements.btnToggleMapMode.addEventListener('click', toggleMapMode);
+    }
+
+    window.addEventListener('online', () => {
+      showNotificationToast('🌐 Internet connection detected — shifting to live online GPS map.');
+      updateMapDisplayMode();
+    });
+
+    window.addEventListener('offline', () => {
+      showNotificationToast('📡 Offline / Mesh mode active — shifting to tactical vector radar.');
+      updateMapDisplayMode();
+    });
+
     if (elements.btnRecenterMap) {
       elements.btnRecenterMap.addEventListener('click', () => {
         acquireGpsPosition(true);
         mapManualZoom = 1.0;
-        if (state.activeView === 'map') drawMap();
+        const myLat = state.myCoords ? state.myCoords.latitude : 17.3850;
+        const myLon = state.myCoords ? state.myCoords.longitude : 78.4867;
+
+        if (leafletMap && elements.onlineLeafletMap && elements.onlineLeafletMap.style.display !== 'none') {
+          leafletMap.setView([myLat, myLon], 16);
+          syncLeafletMarkers();
+        } else if (state.activeView === 'map') {
+          drawMap();
+        }
       });
     }
 
@@ -5212,15 +5471,23 @@
 
     if (elements.btnMapZoomIn) {
       elements.btnMapZoomIn.addEventListener('click', () => {
-        mapManualZoom = Math.min(50.0, mapManualZoom * 1.4);
-        drawMap();
+        if (leafletMap && elements.onlineLeafletMap && elements.onlineLeafletMap.style.display !== 'none') {
+          leafletMap.zoomIn();
+        } else {
+          mapManualZoom = Math.min(50.0, mapManualZoom * 1.4);
+          drawMap();
+        }
       });
     }
 
     if (elements.btnMapZoomOut) {
       elements.btnMapZoomOut.addEventListener('click', () => {
-        mapManualZoom = Math.max(0.001, mapManualZoom / 1.4);
-        drawMap();
+        if (leafletMap && elements.onlineLeafletMap && elements.onlineLeafletMap.style.display !== 'none') {
+          leafletMap.zoomOut();
+        } else {
+          mapManualZoom = Math.max(0.001, mapManualZoom / 1.4);
+          drawMap();
+        }
       });
     }
 
