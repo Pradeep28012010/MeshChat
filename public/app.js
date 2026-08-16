@@ -633,10 +633,23 @@
 
     rpsModalOverlay: document.getElementById('rps-modal-overlay'),
     rpsModalCloseBtn: document.getElementById('rps-modal-close-btn'),
+    btnRpsModeChallenge: document.getElementById('btn-rps-mode-challenge'),
+    btnRpsModeBot: document.getElementById('btn-rps-mode-bot'),
     rpsSelfHand: document.getElementById('rps-self-hand'),
     rpsPeerHand: document.getElementById('rps-peer-hand'),
     rpsStatusBadge: document.getElementById('rps-status-badge'),
     rpsResultText: document.getElementById('rps-result-text'),
+
+    // User Profile Modal
+    profileModalOverlay: document.getElementById('profile-modal-overlay'),
+    profileModalCloseBtn: document.getElementById('profile-modal-close-btn'),
+    modalAvatarWrap: document.getElementById('modal-avatar-wrap'),
+    modalAvatarPreview: document.getElementById('modal-avatar-preview'),
+    modalProfileNameInput: document.getElementById('modal-profile-name-input'),
+    modalStatusBeacon: document.getElementById('modal-status-beacon'),
+    modalGpsCoordsText: document.getElementById('modal-gps-coords-text'),
+    btnModalRecalibrateGps: document.getElementById('btn-modal-recalibrate-gps'),
+    btnSaveProfileModal: document.getElementById('btn-save-profile-modal'),
 
     contactRequestToast: document.getElementById('contact-request-toast'),
     contactReqAvatar: document.getElementById('contact-req-avatar'),
@@ -919,8 +932,11 @@
     btnCoordFmtDd: document.getElementById('btn-coord-fmt-dd'),
     btnCoordFmtDms: document.getElementById('btn-coord-fmt-dms'),
     btnExportGpx: document.getElementById('btn-export-gpx'),
-    btnExportGeojson: document.getElementById('btn-export-geojson'),
     btnDrawerFlare: document.getElementById('btn-drawer-flare'),
+    btnForceGpsLock: document.getElementById('btn-force-gps-lock'),
+    btnClearGpsOffset: document.getElementById('btn-clear-gps-offset'),
+    gpsAccuracyInfo: document.getElementById('gps-accuracy-info'),
+    btnRecenterMap: document.getElementById('btn-recenter-map'),
 
     // PTT & VOX View
     btnPttGiant: document.getElementById('btn-ptt-giant'),
@@ -2105,17 +2121,40 @@
       await dispatchMessage(msg);
     }
 
-  // ⚔️ 2-Player Rock Paper Scissors Showdown
+  // ⚔️ 2-Player Rock Paper Scissors Showdown & Multiplayer Duel
+  let currentRpsMode = 'challenge';
   function initRpsShowdown() {
     if (elements.btnStartRps) {
       elements.btnStartRps.addEventListener('click', () => {
         elements.gamesModalOverlay.classList.remove('active');
-        elements.rpsResultText.textContent = 'Pick your move to start!';
+        currentRpsMode = 'challenge';
+        if (elements.btnRpsModeChallenge) elements.btnRpsModeChallenge.classList.add('active');
+        if (elements.btnRpsModeBot) elements.btnRpsModeBot.classList.remove('active');
+        elements.rpsResultText.textContent = 'Pick your secret move to challenge peers!';
         elements.rpsSelfHand.textContent = '✊';
         elements.rpsPeerHand.textContent = '✊';
         elements.rpsModalOverlay.classList.add('active');
       });
     }
+
+    if (elements.btnRpsModeChallenge) {
+      elements.btnRpsModeChallenge.addEventListener('click', () => {
+        currentRpsMode = 'challenge';
+        elements.btnRpsModeChallenge.classList.add('active');
+        if (elements.btnRpsModeBot) elements.btnRpsModeBot.classList.remove('active');
+        elements.rpsResultText.textContent = 'Pick your secret move to challenge peers!';
+      });
+    }
+
+    if (elements.btnRpsModeBot) {
+      elements.btnRpsModeBot.addEventListener('click', () => {
+        currentRpsMode = 'bot';
+        elements.btnRpsModeBot.classList.add('active');
+        if (elements.btnRpsModeChallenge) elements.btnRpsModeChallenge.classList.remove('active');
+        elements.rpsResultText.textContent = 'Pick your move to duel against AI Bot!';
+      });
+    }
+
     if (elements.rpsModalCloseBtn) {
       elements.rpsModalCloseBtn.addEventListener('click', () => {
         elements.rpsModalOverlay.classList.remove('active');
@@ -2125,12 +2164,104 @@
     document.querySelectorAll('.rps-choice-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const choice = btn.dataset.choice;
-        playRpsRound(choice);
+        if (currentRpsMode === 'bot') {
+          playRpsVsBot(choice);
+        } else {
+          sendRpsChallenge(choice);
+        }
       });
     });
   }
 
-  function playRpsRound(myChoice) {
+  async function sendRpsChallenge(myChoice) {
+    const handEmojis = { rock: '🪨', paper: '📄', scissors: '✂️' };
+    const challengeId = 'rps_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+
+    const msg = {
+      id: challengeId,
+      type: 'rps_challenge',
+      senderId: state.self.id,
+      senderName: state.self.name,
+      targetId: state.activeTargetId,
+      channelId: state.activeTargetId === 'broadcast' ? state.activeChannelId : null,
+      challengerMove: myChoice,
+      status: 'open',
+      timestamp: Date.now()
+    };
+
+    if (elements.rpsModalOverlay) elements.rpsModalOverlay.classList.remove('active');
+    showNotificationToast(`⚔️ RPS Challenge (${handEmojis[myChoice]}) dropped in chat! Waiting for opponent...`);
+    await dispatchMessage(msg);
+
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+      state.ws.send(JSON.stringify({
+        type: 'RPS_CHALLENGE',
+        challengeId: challengeId,
+        challengerName: state.self.name,
+        challengerMove: myChoice,
+        targetId: state.activeTargetId,
+        channelId: state.activeTargetId === 'broadcast' ? state.activeChannelId : null
+      }));
+    }
+  }
+
+  async function acceptRpsChallenge(msg, opponentMove) {
+    const handEmojis = { rock: '🪨', paper: '📄', scissors: '✂️' };
+    if (!msg || msg.status !== 'open') return;
+
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+      state.ws.send(JSON.stringify({
+        type: 'RPS_ACCEPT',
+        challengeId: msg.id,
+        challengerId: msg.senderId,
+        challengerName: msg.senderName,
+        challengerMove: msg.challengerMove,
+        opponentName: state.self.name,
+        opponentMove: opponentMove
+      }));
+    } else {
+      // Local fallback calculation if offline
+      triggerRpsShowdownAnimation({
+        challengerName: msg.senderName,
+        challengerMove: msg.challengerMove,
+        opponentName: state.self.name,
+        opponentMove: opponentMove,
+        outcomeText: msg.challengerMove === opponentMove ? "🤝 It's a Tie / Draw!" : (
+          (opponentMove === 'rock' && msg.challengerMove === 'scissors') ||
+          (opponentMove === 'paper' && msg.challengerMove === 'rock') ||
+          (opponentMove === 'scissors' && msg.challengerMove === 'paper') ? `🏆 ${state.self.name} WINS!` : `🏆 ${msg.senderName} WINS!`
+        )
+      });
+    }
+  }
+
+  function triggerRpsShowdownAnimation(data) {
+    const handEmojis = { rock: '🪨', paper: '📄', scissors: '✂️' };
+    if (!elements.rpsModalOverlay) return;
+
+    if (elements.rpsSelfAvatar) elements.rpsSelfAvatar.textContent = data.challengerName;
+    if (elements.rpsPeerAvatar) elements.rpsPeerAvatar.textContent = data.opponentName;
+    elements.rpsSelfHand.textContent = '✊';
+    elements.rpsPeerHand.textContent = '✊';
+    elements.rpsSelfHand.classList.add('shaking');
+    elements.rpsPeerHand.classList.add('shaking');
+    elements.rpsResultText.textContent = '3... 2... 1... Showdown!';
+    elements.rpsModalOverlay.classList.add('active');
+    playSound('game_move');
+    if ('vibrate' in navigator) navigator.vibrate([50, 50, 50]);
+
+    setTimeout(() => {
+      elements.rpsSelfHand.classList.remove('shaking');
+      elements.rpsPeerHand.classList.remove('shaking');
+      elements.rpsSelfHand.textContent = handEmojis[data.challengerMove] || '✊';
+      elements.rpsPeerHand.textContent = handEmojis[data.opponentMove] || '✊';
+      elements.rpsResultText.textContent = `${data.outcomeText}`;
+      playSound('message_received');
+      if ('vibrate' in navigator) navigator.vibrate(120);
+    }, 1000);
+  }
+
+  function playRpsVsBot(myChoice) {
     const handEmojis = { rock: '🪨', paper: '📄', scissors: '✂️' };
     elements.rpsSelfHand.classList.add('shaking');
     elements.rpsPeerHand.classList.add('shaking');
@@ -2158,7 +2289,7 @@
       ) {
         outcome = '🏆 YOU WIN!';
       } else {
-        outcome = '💥 Opponent Wins!';
+        outcome = '💥 MeshBot Wins!';
       }
 
       elements.rpsResultText.textContent = `${outcome} (${myChoice} vs ${opponentChoice})`;
@@ -2172,7 +2303,7 @@
         senderName: state.self.name,
         targetId: state.activeTargetId,
         channelId: state.activeTargetId === 'broadcast' ? state.activeChannelId : null,
-        text: `⚔️ **RPS Duel:** ${state.self.name} picked ${handEmojis[myChoice]} vs ${handEmojis[opponentChoice]} ➜ **${outcome}**`,
+        text: `⚔️ **RPS Bot Match:** ${state.self.name} (${handEmojis[myChoice]}) vs MeshBot (${handEmojis[opponentChoice]}) ➜ **${outcome}**`,
         timestamp: Date.now()
       };
       await dispatchMessage(msg);
@@ -2687,12 +2818,86 @@
     }
   }
 
-  function initAvatarUpload() {
-    if (elements.selfAvatarWrap && elements.avatarFileInput) {
-      elements.selfAvatarWrap.addEventListener('click', () => {
+  function initProfileModal() {
+    // Open Profile Modal when clicking profile strip or avatar
+    const openProfile = () => {
+      if (!elements.profileModalOverlay) return;
+      if (elements.modalProfileNameInput) elements.modalProfileNameInput.value = state.self.name;
+      if (elements.modalStatusBeacon) elements.modalStatusBeacon.value = state.self.status || '🟢 Active & Online';
+
+      if (elements.modalAvatarPreview) {
+        if (state.self.avatar) {
+          elements.modalAvatarPreview.innerHTML = `<img src="${state.self.avatar}" alt="Avatar" class="peer-avatar-img">`;
+        } else {
+          elements.modalAvatarPreview.innerHTML = getInitials(state.self.name);
+        }
+      }
+
+      if (elements.modalGpsCoordsText && state.myCoords) {
+        elements.modalGpsCoordsText.textContent = `Coords: ${state.myCoords.latitude.toFixed(5)}°, ${state.myCoords.longitude.toFixed(5)}° • Accuracy: ±${Math.round(state.myCoords.accuracy || 10)}m`;
+      }
+
+      elements.profileModalOverlay.classList.add('active');
+    };
+
+    if (elements.selfAvatarWrap) elements.selfAvatarWrap.addEventListener('click', openProfile);
+    if (elements.profileNameInput) elements.profileNameInput.addEventListener('click', openProfile);
+
+    if (elements.profileModalCloseBtn) {
+      elements.profileModalCloseBtn.addEventListener('click', () => {
+        if (elements.profileModalOverlay) elements.profileModalOverlay.classList.remove('active');
+      });
+    }
+
+    if (elements.modalAvatarWrap && elements.avatarFileInput) {
+      elements.modalAvatarWrap.addEventListener('click', () => {
         elements.avatarFileInput.click();
       });
+    }
 
+    if (elements.btnModalRecalibrateGps) {
+      elements.btnModalRecalibrateGps.addEventListener('click', async () => {
+        elements.btnModalRecalibrateGps.textContent = '🛰️ Locking Precision GPS...';
+        await acquireGpsPosition(true);
+        elements.btnModalRecalibrateGps.textContent = '🛰️ GPS Locked!';
+        if (elements.modalGpsCoordsText && state.myCoords) {
+          elements.modalGpsCoordsText.textContent = `Coords: ${state.myCoords.latitude.toFixed(5)}°, ${state.myCoords.longitude.toFixed(5)}° • Accuracy: ±${Math.round(state.myCoords.accuracy || 10)}m`;
+        }
+        setTimeout(() => {
+          if (elements.btnModalRecalibrateGps) elements.btnModalRecalibrateGps.textContent = '🛰️ Acquire Exact GPS Fix';
+        }, 2000);
+      });
+    }
+
+    if (elements.btnSaveProfileModal) {
+      elements.btnSaveProfileModal.addEventListener('click', () => {
+        if (elements.modalProfileNameInput) {
+          const name = elements.modalProfileNameInput.value.trim();
+          if (name) {
+            state.self.name = name;
+            localStorage.setItem('mesh_peer_name', name);
+            if (elements.profileNameInput) elements.profileNameInput.value = name;
+          }
+        }
+        if (elements.modalStatusBeacon) {
+          state.self.status = elements.modalStatusBeacon.value;
+          localStorage.setItem('mesh_peer_status', state.self.status);
+        }
+
+        renderSelfProfile();
+        if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+          state.ws.send(JSON.stringify({
+            type: 'PROFILE_UPDATE',
+            peer: state.self
+          }));
+        }
+
+        if (elements.profileModalOverlay) elements.profileModalOverlay.classList.remove('active');
+        showNotificationToast('✅ Profile & Field Status updated!');
+      });
+    }
+
+    if (elements.avatarFileInput) {
       elements.avatarFileInput.addEventListener('change', (e) => {
         const file = e.target.files && e.target.files[0];
         if (!file) return;
@@ -2719,6 +2924,10 @@
             state.self.avatar = compressed;
             localStorage.setItem('mesh_peer_avatar', compressed);
             renderSelfProfile();
+
+            if (elements.modalAvatarPreview) {
+              elements.modalAvatarPreview.innerHTML = `<img src="${compressed}" alt="Avatar" class="peer-avatar-img">`;
+            }
 
             if (state.ws && state.ws.readyState === WebSocket.OPEN) {
               state.ws.send(JSON.stringify({
@@ -3977,6 +4186,45 @@
         handleIncomingGameMove(data);
         break;
 
+      case 'RPS_CHALLENGE': {
+        const existing = state.messages.find(m => m.id === data.challengeId);
+        if (!existing) {
+          const chMsg = {
+            id: data.challengeId,
+            type: 'rps_challenge',
+            senderId: data.challengerId,
+            senderName: data.challengerName,
+            targetId: data.targetId,
+            channelId: data.channelId,
+            challengerMove: data.challengerMove,
+            status: 'open',
+            timestamp: Date.now()
+          };
+          appendMessage(chMsg, false);
+          showNotificationToast(`⚔️ RPS Challenge from ${data.challengerName}!`);
+        }
+        break;
+      }
+
+      case 'RPS_SHOWDOWN': {
+        const chMsg = state.messages.find(m => m.id === data.challengeId);
+        if (chMsg) {
+          chMsg.status = 'resolved';
+          chMsg.challengerMove = data.challengerMove;
+          chMsg.opponentMove = data.opponentMove;
+          chMsg.challengerName = data.challengerName;
+          chMsg.opponentName = data.opponentName;
+          chMsg.outcomeText = data.outcomeText;
+          chMsg.winnerId = data.winnerId;
+          saveMessageToStorage(chMsg);
+          if (shouldDisplayMessage(chMsg)) {
+            renderSingleMessageBubble(chMsg, chMsg.senderId === state.self.id);
+          }
+        }
+        triggerRpsShowdownAnimation(data);
+        break;
+      }
+
       case 'CHANNEL_CREATE':
         handleIncomingChannelCreate(data);
         break;
@@ -4337,27 +4585,50 @@
       elements.mapGpsStatus.classList.remove('active');
     }
 
+    // 1. Immediately apply saved/calibrated coordinates if available so the map never jumps
+    const stored = localStorage.getItem('mesh_last_coords');
+    if (stored && !forceRefresh) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed.latitude && parsed.longitude) {
+          onGpsFixAcquired(parsed, 'Saved Position');
+        }
+      } catch (e) {}
+    }
+
     let fixAcquired = false;
 
-    // 1. Browser Geolocation (Low accuracy fast Wi-Fi)
+    // 2. Request true hardware high-precision GPS from device
     if (navigator.geolocation) {
       try {
         await new Promise((resolve) => {
           navigator.geolocation.getCurrentPosition(
             (pos) => {
               fixAcquired = true;
-              onGpsFixAcquired({
+              const coords = {
                 latitude: pos.coords.latitude,
                 longitude: pos.coords.longitude,
                 altitude: pos.coords.altitude || 0,
                 heading: pos.coords.heading || 0,
                 speed: pos.coords.speed || 0,
-                accuracy: pos.coords.accuracy || 10
-              }, '3D GPS Fix');
+                accuracy: pos.coords.accuracy || 5
+              };
+              localStorage.setItem('mesh_last_coords', JSON.stringify(coords));
+              localStorage.setItem('mesh_real_gps_locked', 'true');
+              onGpsFixAcquired(coords, '3D High-Precision Fix');
+              if (elements.gpsAccuracyInfo) {
+                elements.gpsAccuracyInfo.textContent = `🛰️ High-Precision GPS Lock • Accuracy: ±${Math.round(pos.coords.accuracy || 5)}m`;
+              }
+              if (forceRefresh) {
+                showNotificationToast(`📍 GPS Locked: ${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)} (±${Math.round(coords.accuracy)}m)`);
+              }
               resolve();
             },
-            () => resolve(),
-            { enableHighAccuracy: false, timeout: 4000, maximumAge: 60000 }
+            (err) => {
+              console.warn('[GPS] High-accuracy geolocation notice:', err.message);
+              resolve();
+            },
+            { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
           );
         });
       } catch (e) {}
@@ -4366,58 +4637,53 @@
       try {
         navigator.geolocation.watchPosition(
           (pos) => {
-            onGpsFixAcquired({
+            const coords = {
               latitude: pos.coords.latitude,
               longitude: pos.coords.longitude,
               altitude: pos.coords.altitude || 0,
               heading: pos.coords.heading || 0,
               speed: pos.coords.speed || 0,
-              accuracy: pos.coords.accuracy || 10
-            }, 'Live GPS Fix');
+              accuracy: pos.coords.accuracy || 5
+            };
+            localStorage.setItem('mesh_last_coords', JSON.stringify(coords));
+            onGpsFixAcquired(coords, 'Live High-Precision Fix');
+            if (elements.gpsAccuracyInfo) {
+              elements.gpsAccuracyInfo.textContent = `🛰️ High-Precision GPS Lock • Accuracy: ±${Math.round(pos.coords.accuracy || 5)}m`;
+            }
           },
           (err) => {
             console.warn('[GPS] Geolocation Watcher Notice:', err.message);
           },
-          { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+          { enableHighAccuracy: true, maximumAge: 3000, timeout: 15000 }
         );
       } catch (e) {}
     }
 
-    if (fixAcquired) return;
+    if (fixAcquired || state.myCoords) return;
 
-    // 2. Free IP Geolocation
+    // 3. Fallback to IP Geolocation only if no prior cached location exists
     try {
       const res = await fetch('https://ipwho.is/', { signal: AbortSignal.timeout(3000) });
       if (res.ok) {
         const ipData = await res.json();
         if (ipData.success && ipData.latitude && ipData.longitude) {
-          onGpsFixAcquired({
+          const coords = {
             latitude: ipData.latitude,
             longitude: ipData.longitude,
             altitude: 40,
             heading: 0,
             speed: 0,
-            accuracy: 100,
-            city: ipData.city || 'Mesh Area'
-          }, `IP Fix (${ipData.city || 'Network'})`);
+            accuracy: 1000,
+            city: ipData.city || 'Network'
+          };
+          localStorage.setItem('mesh_last_coords', JSON.stringify(coords));
+          onGpsFixAcquired(coords, `IP Fix (${ipData.city || 'Network'})`);
           return;
         }
       }
     } catch (e) {}
 
-    // 3. Stored Cache
-    const stored = localStorage.getItem('mesh_last_coords');
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        if (parsed.latitude && parsed.longitude) {
-          onGpsFixAcquired(parsed, 'Cached Fix');
-          return;
-        }
-      } catch (e) {}
-    }
-
-    // 4. Deterministic Local Mesh Rendezvous Location
+    // 4. Rendezvous fallback if all else fails
     const seed = hashStringToNumber(state.self.id);
     const angle = (seed % 360) * (Math.PI / 180);
     const distMeters = 40 + (seed % 100);
@@ -4563,26 +4829,14 @@
     const myLat = state.myCoords ? state.myCoords.latitude : 17.3850;
     const myLon = state.myCoords ? state.myCoords.longitude : 78.4867;
 
-    // Auto-compute range
-    let maxDistMeters = 100;
-    state.peerLocations.forEach((peer, peerId) => {
-      if (peerId !== state.self.id && peer.coords) {
-        const d = calculateDistanceMeters(myLat, myLon, peer.coords.latitude, peer.coords.longitude);
-        if (d > maxDistMeters) maxDistMeters = d;
-      }
-    });
-
-    state.waypoints.forEach(wp => {
-      const d = calculateDistanceMeters(myLat, myLon, wp.lat, wp.lon);
-      if (d > maxDistMeters) maxDistMeters = d;
-    });
-
-    let currentRange = Math.max(200, Math.ceil((maxDistMeters * 1.3) / 50) * 50) / mapManualZoom;
-    if (currentRange > 100000) currentRange = 100000;
+    // Direct tactical zoom scaling: 1.0x = 300m range, 2.0x = 150m, 6.0x = 50m, 0.1x = 3km, 0.005x = 60km
+    const baseRangeMeters = 300;
+    let currentRange = Math.max(20, Math.min(500000, baseRangeMeters / mapManualZoom));
 
     if (elements.mapHudRangeTag) {
       const rangeStr = currentRange >= 1000 ? `${(currentRange / 1000).toFixed(1)}km` : `${Math.round(currentRange)}m`;
-      elements.mapHudRangeTag.textContent = `RANGE: ${rangeStr} • AZIMUTH: 360° BEZEL`;
+      const zoomLabel = mapManualZoom >= 1 ? `${mapManualZoom.toFixed(1)}x` : `${(1 / mapManualZoom).toFixed(1)}x Out`;
+      elements.mapHudRangeTag.textContent = `RANGE: ${rangeStr} [${zoomLabel}] • AZIMUTH: 360° BEZEL`;
     }
 
     // Helper: Convert Lat/Lon to Canvas Pixel Coordinates using Great-Circle Bearing & Distance
@@ -4590,7 +4844,13 @@
       const dist = calculateDistanceMeters(myLat, myLon, lat, lon);
       const rawBearing = calculateRawBearing(myLat, myLon, lat, lon);
       const angleRad = (rawBearing - 90) * (Math.PI / 180);
-      const pixelDist = Math.min(maxRadius * 1.15, (dist / currentRange) * maxRadius);
+      const isOutOfBounds = dist > currentRange;
+      const pixelDist = isOutOfBounds ? (maxRadius + 4) : ((dist / currentRange) * maxRadius);
+
+      const px = centerX + pixelDist * Math.cos(angleRad);
+      const py = centerY + pixelDist * Math.sin(angleRad);
+      return { px, py, dist, rawBearing, isOutOfBounds };
+    }
 
       const px = centerX + pixelDist * Math.cos(angleRad);
       const py = centerY + pixelDist * Math.sin(angleRad);
@@ -4952,16 +5212,43 @@
 
     if (elements.btnMapZoomIn) {
       elements.btnMapZoomIn.addEventListener('click', () => {
-        mapManualZoom = Math.min(5.0, mapManualZoom * 1.35);
+        mapManualZoom = Math.min(50.0, mapManualZoom * 1.4);
         drawMap();
       });
     }
 
     if (elements.btnMapZoomOut) {
       elements.btnMapZoomOut.addEventListener('click', () => {
-        mapManualZoom = Math.max(0.3, mapManualZoom / 1.35);
+        mapManualZoom = Math.max(0.001, mapManualZoom / 1.4);
         drawMap();
       });
+    }
+
+    if (elements.btnForceGpsLock) {
+      elements.btnForceGpsLock.addEventListener('click', () => {
+        acquireGpsPosition(true);
+      });
+    }
+
+    if (elements.btnClearGpsOffset) {
+      elements.btnClearGpsOffset.addEventListener('click', () => {
+        localStorage.removeItem('mesh_last_coords');
+        state.myCoords = null;
+        acquireGpsPosition(true);
+        showNotificationToast('📍 Resetting coordinates to fresh high-accuracy GPS fix...');
+      });
+    }
+
+    if (elements.offlineMapCanvas) {
+      elements.offlineMapCanvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        if (e.deltaY < 0) {
+          mapManualZoom = Math.min(50.0, mapManualZoom * 1.18);
+        } else {
+          mapManualZoom = Math.max(0.001, mapManualZoom / 1.18);
+        }
+        drawMap();
+      }, { passive: false });
     }
 
     if (elements.btnCloseMapPeerCard) {
@@ -5775,6 +6062,44 @@
       `;
     }
 
+    // 5B. Interactive Real-Time Rock Paper Scissors Duel Card
+    if (msg.type === 'rps_challenge') {
+      const isMyChallenge = msg.senderId === state.self.id;
+      const handEmojis = { rock: '🪨', paper: '📄', scissors: '✂️' };
+
+      if (msg.status === 'resolved') {
+        contentHtml += `
+          <div class="dice-challenge-bubble-card" style="padding: 10px 12px; border-color: rgba(0, 122, 255, 0.4); background: rgba(0, 122, 255, 0.05);">
+            <div style="font-size: 13px; font-weight: 700; color: var(--accent-blue); margin-bottom: 4px;">⚔️ RPS Duel Showdown!</div>
+            <div style="font-size: 13.5px; font-weight: 600; margin-bottom: 4px;">
+              ${escapeHtml(msg.challengerName)} (${handEmojis[msg.challengerMove] || '✊'}) vs ${escapeHtml(msg.opponentName)} (${handEmojis[msg.opponentMove] || '✊'})
+            </div>
+            <div style="font-size: 13px; font-weight: 700; color: #34c759;">${msg.outcomeText || 'Showdown Complete'}</div>
+          </div>
+        `;
+      } else {
+        contentHtml += `
+          <div class="dice-challenge-bubble-card" style="padding: 10px 12px;">
+            <div style="font-size: 13px; font-weight: 700; color: var(--accent-blue); margin-bottom: 6px;">⚔️ Rock Paper Scissors Duel</div>
+            ${isMyChallenge ? `
+              <div style="font-size: 12px; color: var(--text-secondary); font-style: italic;">
+                Your move (${handEmojis[msg.challengerMove]}) is locked in. Waiting for an opponent to accept...
+              </div>
+            ` : `
+              <div style="font-size: 12.5px; font-weight: 600; margin-bottom: 8px;">
+                <strong>${escapeHtml(msg.senderName)}</strong> challenged you! Choose your move:
+              </div>
+              <div style="display: flex; gap: 6px;">
+                <button type="button" class="btn btn-secondary btn-sm btn-accept-rps" data-rps-id="${msg.id}" data-choice="rock" style="flex: 1; padding: 7px 4px; font-size: 12px; font-weight: 600;">🪨 Rock</button>
+                <button type="button" class="btn btn-secondary btn-sm btn-accept-rps" data-rps-id="${msg.id}" data-choice="paper" style="flex: 1; padding: 7px 4px; font-size: 12px; font-weight: 600;">📄 Paper</button>
+                <button type="button" class="btn btn-secondary btn-sm btn-accept-rps" data-rps-id="${msg.id}" data-choice="scissors" style="flex: 1; padding: 7px 4px; font-size: 12px; font-weight: 600;">✂️ Scissors</button>
+              </div>
+            `}
+          </div>
+        `;
+      }
+    }
+
     // 6. 2x Dice Roll
     if (msg.type === 'diceroll') {
       contentHtml += `
@@ -5918,6 +6243,17 @@
         const challenger = btn.dataset.challenger;
         elements.diceModalOverlay.classList.add('active');
         elements.diceResultText.textContent = `⚔️ Duel vs ${challenger}! Roll higher than ${targetScore} to win!`;
+      });
+    });
+
+    row.querySelectorAll('.btn-accept-rps').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const rpsId = btn.dataset.rpsId;
+        const choice = btn.dataset.choice;
+        const targetMsg = state.messages.find(m => m.id === rpsId);
+        if (targetMsg) {
+          acceptRpsChallenge(targetMsg, choice);
+        }
       });
     });
 
@@ -7359,7 +7695,7 @@
 
     initMentionsEngine();
     initAiPersonaHandlers();
-    initAvatarUpload();
+    initProfileModal();
   }
 
   // --- 48. Bootstrap ---

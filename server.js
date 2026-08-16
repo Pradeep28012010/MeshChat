@@ -584,6 +584,72 @@ wss.on('connection', (ws, req) => {
           break;
         }
 
+        // Real Two-Player Rock Paper Scissors Duel
+        case 'RPS_CHALLENGE': {
+          if (data.targetId && data.targetId !== 'broadcast') {
+            sendToPeer(data.targetId, {
+              type: 'RPS_CHALLENGE',
+              challengeId: data.challengeId,
+              challengerId: currentPeerId,
+              challengerName: data.challengerName || 'Challenger',
+              challengerMove: data.challengerMove,
+              targetId: data.targetId
+            });
+          } else {
+            broadcast({
+              type: 'RPS_CHALLENGE',
+              challengeId: data.challengeId,
+              challengerId: currentPeerId,
+              challengerName: data.challengerName || 'Challenger',
+              challengerMove: data.challengerMove,
+              channelId: data.channelId
+            });
+          }
+          break;
+        }
+
+        case 'RPS_ACCEPT': {
+          const { challengeId, challengerId, challengerName, challengerMove, opponentMove } = data;
+          const opponentId = currentPeerId;
+          const opponentName = data.opponentName || 'Opponent';
+
+          let outcome = 'tie';
+          let outcomeText = "🤝 It's a Tie / Draw!";
+          let winnerId = null;
+
+          if (challengerMove === opponentMove) {
+            outcome = 'tie';
+            outcomeText = "🤝 It's a Tie / Draw!";
+          } else if (
+            (challengerMove === 'rock' && opponentMove === 'scissors') ||
+            (challengerMove === 'paper' && opponentMove === 'rock') ||
+            (challengerMove === 'scissors' && opponentMove === 'paper')
+          ) {
+            outcome = 'challenger_win';
+            outcomeText = `🏆 ${challengerName} WINS!`;
+            winnerId = challengerId;
+          } else {
+            outcome = 'opponent_win';
+            outcomeText = `🏆 ${opponentName} WINS!`;
+            winnerId = opponentId;
+          }
+
+          broadcast({
+            type: 'RPS_SHOWDOWN',
+            challengeId,
+            challengerId,
+            challengerName,
+            challengerMove,
+            opponentId,
+            opponentName,
+            opponentMove,
+            outcome,
+            outcomeText,
+            winnerId
+          });
+          break;
+        }
+
         // Custom Sub-Channels Creation, Privacy & Member Management
         case 'CHANNEL_CREATE': {
           if (data.channel && !serverChannels.find(c => c.id === data.channel.id)) {
