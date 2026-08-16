@@ -5090,7 +5090,22 @@ body.dark-theme .room-member-role-tag {
 
 /* --- Leaflet Online Map Integration Styles --- */
 #online-leaflet-map {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
   background-color: #111827;
+  z-index: 1;
+}
+
+.leaflet-container {
+  width: 100% !important;
+  height: 100% !important;
+  background: #0f172a !important;
+  font-family: inherit !important;
 }
 
 .leaflet-custom-div-icon {

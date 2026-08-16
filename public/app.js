@@ -4573,11 +4573,14 @@
   // --- Online Leaflet GPS Map Engine ---
   function initLeafletMap() {
     if (!window.L || !elements.onlineLeafletMap) return;
-    if (leafletMap) return;
+    if (leafletMap) {
+      setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 50);
+      return;
+    }
 
     try {
-      const initLat = state.myCoords ? state.myCoords.latitude : 17.3850;
-      const initLon = state.myCoords ? state.myCoords.longitude : 78.4867;
+      const initLat = state.myCoords ? state.myCoords.latitude : 16.8364;
+      const initLon = state.myCoords ? state.myCoords.longitude : 82.0287;
 
       leafletMap = L.map('online-leaflet-map', {
         center: [initLat, initLon],
@@ -4588,6 +4591,10 @@
 
       setLeafletTileLayer(state.mapMode === 'satellite' ? 'satellite' : 'streets');
 
+      leafletMap.on('movestart', () => {
+        leafletMap._userPanned = true;
+      });
+
       // Click on Online Map to Drop Waypoint Pin
       leafletMap.on('click', (e) => {
         if (elements.wpLatInput && elements.wpLonInput) {
@@ -4596,6 +4603,16 @@
           openWaypointModal();
         }
       });
+
+      setTimeout(() => {
+        if (leafletMap) {
+          leafletMap.invalidateSize();
+          if (state.myCoords) {
+            leafletMap.setView([state.myCoords.latitude, state.myCoords.longitude], 16);
+          }
+          syncLeafletMarkers();
+        }
+      }, 100);
     } catch (e) {
       console.warn('[Leaflet] Init error:', e);
     }
@@ -4610,14 +4627,9 @@
         maxZoom: 19
       }).addTo(leafletMap);
     } else {
-      const isDark = document.body.classList.contains('dark-theme') || document.body.classList.contains('red-vision-theme');
-      const tileUrl = isDark
-        ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-        : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
-
-      leafletTileLayer = L.tileLayer(tileUrl, {
-        subdomains: 'abcd',
-        maxZoom: 20
+      // Standard vibrant OpenStreetMap with colored roads, cities, building footprints
+      leafletTileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19
       }).addTo(leafletMap);
     }
   }
@@ -4642,7 +4654,7 @@
           leafletMap.invalidateSize();
           syncLeafletMarkers();
         }
-      }, 50);
+      }, 80);
 
       if (elements.btnToggleMapMode) {
         const modeLabel = state.mapMode === 'auto'
@@ -4651,7 +4663,7 @@
         elements.btnToggleMapMode.textContent = modeLabel;
       }
     } else {
-      // Offline Radar Mode
+      // Offline Tactical Radar Mode
       if (elements.onlineLeafletMap) elements.onlineLeafletMap.style.display = 'none';
       if (elements.offlineMapCanvas) elements.offlineMapCanvas.style.display = 'block';
       if (elements.mapHudRangeTag) elements.mapHudRangeTag.style.display = 'block';
