@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="description" content="Zero-Internet Offline Messaging, Calling, GPS Map, Walkie-Talkie & Survival Suite">
   <link rel="manifest" href="./manifest.json">
-  <link rel="stylesheet" href="./styles.css?v=3.7">
+  <link rel="stylesheet" href="./styles.css?v=3.8">
   <title>MeshChat — Online Cloud & Offline Mesh Suite</title>
 </head>
 <body>
@@ -357,7 +357,7 @@
     <!-- 2. Offline GPS Map, 360° Compass & Elevation Tracker View -->
     <section class="map-main view-pane" id="view-pane-map" style="display: none;">
       
-      <!-- Top Tactical Stats Strip -->
+      <!-- Top Tactical Stats Strip (Primary & Secondary Telemetry) -->
       <div class="map-stats-strip">
         <div class="map-stat-item">
           <span class="stat-label">GPS:</span>
@@ -365,27 +365,40 @@
         </div>
         <div class="map-stat-item">
           <span class="stat-label">HEADING:</span>
-          <span class="stat-value" id="map-compass-heading">000° N</span>
+          <span class="stat-value" id="map-compass-heading" title="Click to rotate compass heading">000° N</span>
+        </div>
+        <div class="map-stat-item">
+          <span class="stat-label">SPEED:</span>
+          <span class="stat-value" id="map-speed-stat">0.0 km/h</span>
+        </div>
+        <div class="map-stat-item">
+          <span class="stat-label">ODOMETER:</span>
+          <span class="stat-value" id="map-odometer-stat">0.00 km</span>
         </div>
         <div class="map-stat-item">
           <span class="stat-label">ELEVATION:</span>
           <span class="stat-value" id="map-elevation-stat">0 m</span>
         </div>
         <div class="map-stat-item">
-          <span class="stat-label">TRAIL:</span>
-          <span class="stat-value" id="map-trail-points">0 pts</span>
+          <span class="stat-label">COORDS:</span>
+          <span class="stat-value" id="map-coords-stat" title="Click to toggle DD / DMS format" style="cursor: pointer;">17.3850°, 78.4867°</span>
         </div>
         <div class="map-actions-group">
-          <button class="btn btn-secondary" id="btn-toggle-elevation-panel" style="padding: 4px 10px; font-size: 11.5px;">📈 Profile</button>
-          <button class="btn btn-secondary" id="btn-drop-waypoint" style="padding: 4px 10px; font-size: 11.5px;">+ Pin</button>
-          <button class="btn btn-secondary" id="btn-recenter-map" style="padding: 4px 10px; font-size: 11.5px;">🎯 Recenter</button>
+          <button type="button" class="btn btn-secondary" id="btn-open-squad-drawer" style="padding: 4px 10px; font-size: 11.5px;">👥 Squad</button>
+          <button type="button" class="btn btn-secondary" id="btn-open-waypoints-vault" style="padding: 4px 10px; font-size: 11.5px;">📍 Waypoints</button>
+          <button type="button" class="btn btn-secondary" id="btn-toggle-radar-sweep" style="padding: 4px 10px; font-size: 11.5px;">📡 Sweep: ON</button>
+          <button type="button" class="btn btn-secondary" id="btn-toggle-elevation-panel" style="padding: 4px 10px; font-size: 11.5px;">📈 Profile</button>
+          <button type="button" class="btn btn-secondary" id="btn-drop-flare" style="padding: 4px 10px; font-size: 11.5px; color: #ff3b30;" title="Broadcast Emergency Flare Beacon">🚨 Flare</button>
+          <button type="button" class="btn btn-secondary" id="btn-drop-waypoint" style="padding: 4px 10px; font-size: 11.5px;">+ Pin</button>
+          <button type="button" class="btn btn-secondary" id="btn-recenter-map" style="padding: 4px 10px; font-size: 11.5px;">🎯 Recenter</button>
         </div>
       </div>
 
       <!-- Live Direction Guidance HUD Arrow -->
       <div class="peer-guide-radar" id="peer-guide-radar" style="display: none;">
         <span class="guide-arrow" id="guide-arrow">⬆</span>
-        <span class="guide-text" id="guide-text">Guidance to Peer</span>
+        <span class="guide-text" id="guide-text">Guidance to Target</span>
+        <button type="button" id="btn-cancel-guide" style="background: none; border: none; color: #ffffff; font-size: 14px; cursor: pointer; margin-left: 6px;">&times;</button>
       </div>
 
       <!-- Collapsible Elevation Profile & Weather Warning Card -->
@@ -416,12 +429,17 @@
         </div>
         <div class="map-peer-card-actions">
           <button type="button" class="btn btn-primary btn-sm" id="btn-map-chat-peer" style="flex: 1; padding: 6px 10px; font-size: 12px;">💬 Message</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-map-guide-peer" style="flex: 1; padding: 6px 10px; font-size: 12px;">🎯 Guide Me</button>
           <button type="button" class="btn btn-secondary btn-sm" id="btn-map-call-peer" style="flex: 1; padding: 6px 10px; font-size: 12px;">📞 Call</button>
         </div>
       </div>
 
       <div class="map-canvas-container">
         <canvas id="offline-map-canvas"></canvas>
+        
+        <!-- Rangefinder & Azimuth HUD overlay -->
+        <div class="map-hud-overlay-tag" id="map-hud-range-tag">RANGE: 300m • AZIMUTH: 360° BEZEL</div>
+
         <div class="map-zoom-controls">
           <button type="button" class="map-zoom-btn" id="btn-map-zoom-in" title="Zoom In">+</button>
           <button type="button" class="map-zoom-btn" id="btn-map-zoom-out" title="Zoom Out">&minus;</button>
@@ -738,7 +756,7 @@
       <div class="modal-header">
         <div>
           <h3 class="modal-title">📍 Drop Offline Waypoint</h3>
-          <p class="modal-subtitle">Pin a marker on the map for the group</p>
+          <p class="modal-subtitle">Pin a marker on the tactical map for the mesh</p>
         </div>
         <button class="close-btn" id="waypoint-modal-close-btn">&times;</button>
       </div>
@@ -749,16 +767,82 @@
       </div>
 
       <div class="field-group" style="margin-bottom: 18px;">
-        <label class="ip-section-label">Waypoint Icon:</label>
-        <div class="color-palette" id="waypoint-icon-palette">
-          <button class="stroke-btn active" data-icon="⛺">⛺ Camp</button>
-          <button class="stroke-btn" data-icon="💧">💧 Water</button>
-          <button class="stroke-btn" data-icon="🚗">🚗 Vehicle</button>
-          <button class="stroke-btn" data-icon="🚩">🚩 Meeting</button>
+        <label class="ip-section-label">Waypoint Category & Icon:</label>
+        <div class="color-palette" id="waypoint-icon-palette" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
+          <button type="button" class="stroke-btn active" data-icon="⛺">⛺ Camp</button>
+          <button type="button" class="stroke-btn" data-icon="💧">💧 Water</button>
+          <button type="button" class="stroke-btn" data-icon="🚗">🚗 Vehicle</button>
+          <button type="button" class="stroke-btn" data-icon="🚩">🚩 Rally</button>
+          <button type="button" class="stroke-btn" data-icon="⚠️">⚠️ Danger</button>
+          <button type="button" class="stroke-btn" data-icon="🏥">🏥 Medical</button>
+          <button type="button" class="stroke-btn" data-icon="🌲">🌲 Landmark</button>
+          <button type="button" class="stroke-btn" data-icon="📍">📍 Waypoint</button>
         </div>
       </div>
 
       <button class="btn btn-primary" style="width: 100%;" id="btn-confirm-waypoint">Save Waypoint</button>
+    </div>
+  </div>
+
+  <!-- Tactical Squad & Waypoint Manager Slide-Out Drawer Modal -->
+  <div class="modal-overlay" id="map-drawer-overlay">
+    <div class="modal-card" style="max-width: 520px; width: 92%;">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">🗺️ Tactical Map Command Center</h3>
+          <p class="modal-subtitle">Real-time squad positioning, waypoints & navigation tools</p>
+        </div>
+        <button class="close-btn" id="map-drawer-close-btn">&times;</button>
+      </div>
+
+      <!-- Segmented Tab Switcher -->
+      <div class="poll-choice-selector" style="margin-bottom: 14px;">
+        <button type="button" class="poll-choice-btn active" id="tab-tactical-squad">👥 Squad Radar</button>
+        <button type="button" class="poll-choice-btn" id="tab-tactical-waypoints">📍 Waypoints</button>
+        <button type="button" class="poll-choice-btn" id="tab-tactical-tools">📐 Tools & Export</button>
+      </div>
+
+      <!-- Tab Pane 1: Squad Radar Tracker -->
+      <div class="tactical-drawer-pane" id="pane-tactical-squad" style="display: block;">
+        <div class="squad-list-container" id="squad-radar-list" style="max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
+          <!-- Populated dynamically via JS -->
+        </div>
+      </div>
+
+      <!-- Tab Pane 2: Waypoints Vault -->
+      <div class="tactical-drawer-pane" id="pane-tactical-waypoints" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <span style="font-size: 12px; font-weight: 600; color: var(--text-secondary);">Active Map Pins</span>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-drawer-add-waypoint" style="padding: 4px 10px; font-size: 11.5px;">+ New Waypoint</button>
+        </div>
+        <div class="waypoints-list-container" id="waypoints-vault-list" style="max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
+          <!-- Populated dynamically via JS -->
+        </div>
+      </div>
+
+      <!-- Tab Pane 3: Tactical Tools & GPX Export -->
+      <div class="tactical-drawer-pane" id="pane-tactical-tools" style="display: none;">
+        <div class="field-group" style="margin-bottom: 12px;">
+          <label class="ip-section-label">Coordinate Display Format:</label>
+          <div class="poll-choice-selector">
+            <button type="button" class="poll-choice-btn active" id="btn-coord-fmt-dd">Decimal (DD)</button>
+            <button type="button" class="poll-choice-btn" id="btn-coord-fmt-dms">DMS (Deg Min Sec)</button>
+          </div>
+        </div>
+
+        <div class="field-group" style="margin-bottom: 12px;">
+          <label class="ip-section-label">GPS Trail & Waypoint Export:</label>
+          <div style="display: flex; gap: 8px;">
+            <button type="button" class="btn btn-secondary" id="btn-export-gpx" style="flex: 1; font-size: 12px;">📥 Export GPX</button>
+            <button type="button" class="btn btn-secondary" id="btn-export-geojson" style="flex: 1; font-size: 12px;">📥 Export GeoJSON</button>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label class="ip-section-label">Emergency Broadcast:</label>
+          <button type="button" class="btn btn-danger" id="btn-drawer-flare" style="width: 100%; font-weight: 700; background: #ff3b30; color: #fff;">🚨 Drop Tactical Emergency Flare</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1761,6 +1845,6 @@
     </div>
   </div>
 
-  <script src="./app.js?v=3.7"></script>
+  <script src="./app.js?v=3.8"></script>
 </body>
 </html>

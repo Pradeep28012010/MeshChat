@@ -1624,6 +1624,66 @@ body.dark-theme .peer-avatar {
   transition: all 0.15s ease;
 }
 
+.map-hud-overlay-tag {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  background: rgba(15, 20, 30, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--accent-blue);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+  z-index: 10;
+}
+
+.squad-item-card, .waypoint-item-card {
+  background: var(--bg-surface-secondary);
+  border: 1px solid var(--border-divider);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  transition: background 0.15s ease;
+}
+
+.squad-item-card:hover, .waypoint-item-card:hover {
+  background: var(--bg-surface);
+}
+
+.squad-item-meta, .waypoint-item-meta {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.squad-item-name, .waypoint-item-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.squad-item-sub, .waypoint-item-sub {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  margin-top: 2px;
+}
+
+.squad-item-actions, .waypoint-item-actions {
+  display: flex;
+  gap: 6px;
+}
+
 .map-zoom-btn:hover {
   background: var(--accent-blue);
   transform: scale(1.08);

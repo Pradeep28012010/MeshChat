@@ -433,6 +433,13 @@
     waypoints: JSON.parse(localStorage.getItem('mesh_waypoints') || '[]'),
     myTrail: JSON.parse(localStorage.getItem('mesh_my_trail') || '[]'),
     elevationHistory: JSON.parse(localStorage.getItem('mesh_elevation_history') || '[]'),
+    mapFlares: [],
+    radarSweepEnabled: true,
+    radarSweepAngle: 0,
+    coordFormat: localStorage.getItem('mesh_coord_fmt') || 'DD',
+    guidedTarget: null,
+    currentSpeedKmh: 0,
+    totalOdometerKm: 0,
     messages: [],
     searchQuery: '',
     replyingTo: null,
@@ -860,8 +867,15 @@
     offlineMapCanvas: document.getElementById('offline-map-canvas'),
     mapGpsStatus: document.getElementById('map-gps-status'),
     mapCompassHeading: document.getElementById('map-compass-heading'),
+    mapSpeedStat: document.getElementById('map-speed-stat'),
+    mapOdometerStat: document.getElementById('map-odometer-stat'),
     mapElevationStat: document.getElementById('map-elevation-stat'),
+    mapCoordsStat: document.getElementById('map-coords-stat'),
     mapTrailPoints: document.getElementById('map-trail-points'),
+    btnOpenSquadDrawer: document.getElementById('btn-open-squad-drawer'),
+    btnOpenWaypointsVault: document.getElementById('btn-open-waypoints-vault'),
+    btnToggleRadarSweep: document.getElementById('btn-toggle-radar-sweep'),
+    btnDropFlare: document.getElementById('btn-drop-flare'),
     btnDropWaypoint: document.getElementById('btn-drop-waypoint'),
     btnRecenterMap: document.getElementById('btn-recenter-map'),
     btnToggleElevationPanel: document.getElementById('btn-toggle-elevation-panel'),
@@ -874,6 +888,7 @@
     peerGuideRadar: document.getElementById('peer-guide-radar'),
     guideArrow: document.getElementById('guide-arrow'),
     guideText: document.getElementById('guide-text'),
+    btnCancelGuide: document.getElementById('btn-cancel-guide'),
     waypointModalOverlay: document.getElementById('waypoint-modal-overlay'),
     waypointModalCloseBtn: document.getElementById('waypoint-modal-close-btn'),
     waypointNameInput: document.getElementById('waypoint-name-input'),
@@ -885,9 +900,27 @@
     mapPeerCardDist: document.getElementById('map-peer-card-dist'),
     btnCloseMapPeerCard: document.getElementById('btn-close-map-peer-card'),
     btnMapChatPeer: document.getElementById('btn-map-chat-peer'),
+    btnMapGuidePeer: document.getElementById('btn-map-guide-peer'),
     btnMapCallPeer: document.getElementById('btn-map-call-peer'),
+    mapHudRangeTag: document.getElementById('map-hud-range-tag'),
     btnMapZoomIn: document.getElementById('btn-map-zoom-in'),
     btnMapZoomOut: document.getElementById('btn-map-zoom-out'),
+    mapDrawerOverlay: document.getElementById('map-drawer-overlay'),
+    mapDrawerCloseBtn: document.getElementById('map-drawer-close-btn'),
+    tabTacticalSquad: document.getElementById('tab-tactical-squad'),
+    tabTacticalWaypoints: document.getElementById('tab-tactical-waypoints'),
+    tabTacticalTools: document.getElementById('tab-tactical-tools'),
+    paneTacticalSquad: document.getElementById('pane-tactical-squad'),
+    paneTacticalWaypoints: document.getElementById('pane-tactical-waypoints'),
+    paneTacticalTools: document.getElementById('pane-tactical-tools'),
+    squadRadarList: document.getElementById('squad-radar-list'),
+    waypointsVaultList: document.getElementById('waypoints-vault-list'),
+    btnDrawerAddWaypoint: document.getElementById('btn-drawer-add-waypoint'),
+    btnCoordFmtDd: document.getElementById('btn-coord-fmt-dd'),
+    btnCoordFmtDms: document.getElementById('btn-coord-fmt-dms'),
+    btnExportGpx: document.getElementById('btn-export-gpx'),
+    btnExportGeojson: document.getElementById('btn-export-geojson'),
+    btnDrawerFlare: document.getElementById('btn-drawer-flare'),
 
     // PTT & VOX View
     btnPttGiant: document.getElementById('btn-ptt-giant'),
@@ -2463,22 +2496,27 @@
     const idx = Math.round(deg / 22.5) % 16;
     const cardinal = directions[idx];
 
-    elements.mapCompassHeading.textContent = `${String(deg).padStart(3, '0')}° ${cardinal}`;
+    if (elements.mapCompassHeading) {
+      elements.mapCompassHeading.textContent = `${String(deg).padStart(3, '0')}° ${cardinal}`;
+    }
 
-    if (state.activeTargetId && state.activeTargetId !== 'broadcast' && state.myCoords) {
+    let target = state.guidedTarget;
+    if (!target && state.activeTargetId && state.activeTargetId !== 'broadcast' && state.myCoords) {
       const targetLoc = state.peerLocations.get(state.activeTargetId);
       if (targetLoc && targetLoc.coords) {
-        const rawBearing = calculateRawBearing(state.myCoords.latitude, state.myCoords.longitude, targetLoc.coords.latitude, targetLoc.coords.longitude);
-        const relativeBearing = (rawBearing - state.myHeading + 360) % 360;
-        const distStr = calculateDistance(state.myCoords.latitude, state.myCoords.longitude, targetLoc.coords.latitude, targetLoc.coords.longitude);
-
-        elements.peerGuideRadar.style.display = 'flex';
-        elements.guideArrow.style.transform = `rotate(${relativeBearing}deg)`;
-        elements.guideText.textContent = `${targetLoc.name || 'Peer'}: ${distStr} (${Math.round(rawBearing)}°)`;
-      } else {
-        elements.peerGuideRadar.style.display = 'none';
+        target = { name: targetLoc.name || 'Peer', lat: targetLoc.coords.latitude, lon: targetLoc.coords.longitude };
       }
-    } else {
+    }
+
+    if (target && state.myCoords && elements.peerGuideRadar) {
+      const rawBearing = calculateRawBearing(state.myCoords.latitude, state.myCoords.longitude, target.lat, target.lon);
+      const relativeBearing = (rawBearing - state.myHeading + 360) % 360;
+      const distStr = calculateDistance(state.myCoords.latitude, state.myCoords.longitude, target.lat, target.lon);
+
+      elements.peerGuideRadar.style.display = 'flex';
+      if (elements.guideArrow) elements.guideArrow.style.transform = `rotate(${relativeBearing}deg)`;
+      if (elements.guideText) elements.guideText.textContent = `${target.name}: ${distStr} (${Math.round(rawBearing)}°)`;
+    } else if (elements.peerGuideRadar) {
       elements.peerGuideRadar.style.display = 'none';
     }
   }
@@ -2841,26 +2879,47 @@
   }, 1000);
 
   // --- 23. ✏️ Message Editing & Delete for Everyone ---
-  function startEditingMessage(msg) {
+  function startEditingMessage(msgOrId) {
+    const msg = typeof msgOrId === 'object' && msgOrId !== null
+      ? msgOrId
+      : state.messages.find(m => m.id === msgOrId);
+
+    if (!msg) {
+      console.warn('[Edit] Target message not found:', msgOrId);
+      return;
+    }
+
     state.editingMessageId = msg.id;
-    elements.editSnippet.textContent = msg.text || '';
-    elements.editBar.style.display = 'flex';
+    if (elements.editSnippet) {
+      elements.editSnippet.textContent = msg.text || '(media/attachment)';
+    }
+    if (elements.editBar) {
+      elements.editBar.style.display = 'flex';
+    }
+    if (elements.replyBar) {
+      elements.replyBar.style.display = 'none';
+    }
+    state.activeQuotedMsg = null;
+
     elements.chatMessageInput.value = msg.text || '';
     elements.chatMessageInput.focus();
+    elements.chatMessageInput.select();
   }
 
   function cancelEditing() {
     state.editingMessageId = null;
-    elements.editBar.style.display = 'none';
+    if (elements.editBar) elements.editBar.style.display = 'none';
     elements.chatMessageInput.value = '';
   }
 
   async function submitEditMessage(newText) {
     const msgId = state.editingMessageId;
+    if (!msgId) return;
     const msg = state.messages.find(m => m.id === msgId);
     if (msg) {
       msg.text = newText;
       msg.isEdited = true;
+      msg.editedAt = Date.now();
       saveMessageToStorage(msg);
       renderSingleMessageBubble(msg, true);
 
@@ -2880,6 +2939,7 @@
     if (msg) {
       msg.text = data.newText;
       msg.isEdited = true;
+      msg.editedAt = Date.now();
       saveMessageToStorage(msg);
       if (shouldDisplayMessage(msg)) {
         renderSingleMessageBubble(msg, msg.senderId === state.self.id);
@@ -4025,6 +4085,26 @@
         if (!state.waypoints.find(w => w.id === data.waypoint.id)) {
           state.waypoints.push(data.waypoint);
           localStorage.setItem('mesh_waypoints', JSON.stringify(state.waypoints));
+          if (state.activeView === 'map') {
+            drawMap();
+            renderWaypointsVaultDrawer();
+          }
+        }
+        break;
+
+      case 'WAYPOINT_DELETE':
+        state.waypoints = state.waypoints.filter(w => w.id !== data.waypointId);
+        localStorage.setItem('mesh_waypoints', JSON.stringify(state.waypoints));
+        if (state.activeView === 'map') {
+          drawMap();
+          renderWaypointsVaultDrawer();
+        }
+        break;
+
+      case 'MAP_FLARE':
+        if (data.flare) {
+          state.mapFlares.push(data.flare);
+          try { playSound('sos_beep'); } catch (e) {}
           if (state.activeView === 'map') drawMap();
         }
         break;
@@ -4167,6 +4247,8 @@
   let mapManualZoom = 1.0;
   let mapSelectedPeerId = null;
   let drawnPeerHitboxes = [];
+  let drawnWaypointHitboxes = [];
+  let radarAnimFrameId = null;
 
   function hashStringToNumber(str) {
     if (!str) return 42;
@@ -4204,12 +4286,42 @@
     return (θ * 180 / Math.PI + 360) % 360;
   }
 
+  function formatCoordinatesDisplay(lat, lon) {
+    if (state.coordFormat === 'DMS') {
+      const formatDMS = (val, isLat) => {
+        const dir = isLat ? (val >= 0 ? 'N' : 'S') : (val >= 0 ? 'E' : 'W');
+        const absVal = Math.abs(val);
+        const deg = Math.floor(absVal);
+        const minFloat = (absVal - deg) * 60;
+        const min = Math.floor(minFloat);
+        const sec = Math.round((minFloat - min) * 60);
+        return `${deg}°${String(min).padStart(2, '0')}'${String(sec).padStart(2, '0')}"${dir}`;
+      };
+      return `${formatDMS(lat, true)} ${formatDMS(lon, false)}`;
+    }
+    return `${lat.toFixed(4)}°, ${lon.toFixed(4)}°`;
+  }
+
   function initMapEngine() {
     if (elements.offlineMapCanvas) {
       mapCanvasCtx = elements.offlineMapCanvas.getContext('2d');
     }
     acquireGpsPosition(false);
     initMapEventListeners();
+    startRadarSweepAnimation();
+  }
+
+  function startRadarSweepAnimation() {
+    if (radarAnimFrameId) cancelAnimationFrame(radarAnimFrameId);
+
+    const sweepStep = () => {
+      if (state.activeView === 'map' && state.radarSweepEnabled) {
+        state.radarSweepAngle = (state.radarSweepAngle + 1.2) % 360;
+        drawMap();
+      }
+      radarAnimFrameId = requestAnimationFrame(sweepStep);
+    };
+    radarAnimFrameId = requestAnimationFrame(sweepStep);
   }
 
   async function acquireGpsPosition(forceRefresh = false) {
@@ -4220,7 +4332,7 @@
 
     let fixAcquired = false;
 
-    // 1. Try Browser Geolocation
+    // 1. Browser Geolocation (Low accuracy fast Wi-Fi)
     if (navigator.geolocation) {
       try {
         await new Promise((resolve) => {
@@ -4232,6 +4344,7 @@
                 longitude: pos.coords.longitude,
                 altitude: pos.coords.altitude || 0,
                 heading: pos.coords.heading || 0,
+                speed: pos.coords.speed || 0,
                 accuracy: pos.coords.accuracy || 10
               }, '3D GPS Fix');
               resolve();
@@ -4242,7 +4355,7 @@
         });
       } catch (e) {}
 
-      // Start continuous watcher
+      // Continuous high accuracy watcher
       try {
         navigator.geolocation.watchPosition(
           (pos) => {
@@ -4251,6 +4364,7 @@
               longitude: pos.coords.longitude,
               altitude: pos.coords.altitude || 0,
               heading: pos.coords.heading || 0,
+              speed: pos.coords.speed || 0,
               accuracy: pos.coords.accuracy || 10
             }, 'Live GPS Fix');
           },
@@ -4264,7 +4378,7 @@
 
     if (fixAcquired) return;
 
-    // 2. Fallback: Free IP-based Geolocation (works fast on laptops and InPrivate mode)
+    // 2. Free IP Geolocation
     try {
       const res = await fetch('https://ipwho.is/', { signal: AbortSignal.timeout(3000) });
       if (res.ok) {
@@ -4275,6 +4389,7 @@
             longitude: ipData.longitude,
             altitude: 40,
             heading: 0,
+            speed: 0,
             accuracy: 100,
             city: ipData.city || 'Mesh Area'
           }, `IP Fix (${ipData.city || 'Network'})`);
@@ -4283,7 +4398,7 @@
       }
     } catch (e) {}
 
-    // 3. Fallback: Stored Coords
+    // 3. Stored Cache
     const stored = localStorage.getItem('mesh_last_coords');
     if (stored) {
       try {
@@ -4296,7 +4411,6 @@
     }
 
     // 4. Deterministic Local Mesh Rendezvous Location
-    // Spread peers around local mesh basecamp with spatial separation
     const seed = hashStringToNumber(state.self.id);
     const angle = (seed % 360) * (Math.PI / 180);
     const distMeters = 40 + (seed % 100);
@@ -4310,6 +4424,7 @@
       longitude: baseLon + lonOffset,
       altitude: 120,
       heading: (seed * 45) % 360,
+      speed: 0,
       accuracy: 20
     }, 'Mesh Radar Fix');
   }
@@ -4329,14 +4444,30 @@
 
     const last = state.myTrail[state.myTrail.length - 1];
     if (!last || Math.abs(last.lat - coords.latitude) > 0.00005 || Math.abs(last.lon - coords.longitude) > 0.00005) {
+      const now = Date.now();
+      if (last) {
+        const distStep = calculateDistanceMeters(last.lat, last.lon, coords.latitude, coords.longitude);
+        const timeSec = Math.max(1, (now - (last.time || now)) / 1000);
+        const speedKmh = (distStep / timeSec) * 3.6;
+        state.currentSpeedKmh = Math.min(120, Math.round(speedKmh * 10) / 10);
+      }
+
       state.myTrail.push({
         lat: coords.latitude,
         lon: coords.longitude,
-        time: Date.now()
+        time: now
       });
+
       if (state.myTrail.length > 500) state.myTrail.shift();
       localStorage.setItem('mesh_my_trail', JSON.stringify(state.myTrail));
     }
+
+    // Recompute total odometer
+    let totalDist = 0;
+    for (let i = 1; i < state.myTrail.length; i++) {
+      totalDist += calculateDistanceMeters(state.myTrail[i-1].lat, state.myTrail[i-1].lon, state.myTrail[i].lat, state.myTrail[i].lon);
+    }
+    state.totalOdometerKm = Math.round((totalDist / 1000) * 100) / 100;
 
     checkGeofenceProximity(coords.latitude, coords.longitude);
     broadcastGpsPosition();
@@ -4365,9 +4496,16 @@
 
   function updateMapStats() {
     if (elements.mapTrailPoints) elements.mapTrailPoints.textContent = `${state.myTrail.length} pts`;
-    if (state.myCoords && elements.mapGpsStatus) {
-      elements.mapGpsStatus.textContent = `Fix (${state.myCoords.latitude.toFixed(4)}, ${state.myCoords.longitude.toFixed(4)})`;
-      elements.mapGpsStatus.classList.add('active');
+    if (elements.mapSpeedStat) elements.mapSpeedStat.textContent = `${state.currentSpeedKmh || 0} km/h`;
+    if (elements.mapOdometerStat) elements.mapOdometerStat.textContent = `${state.totalOdometerKm.toFixed(2)} km`;
+    if (state.myCoords) {
+      if (elements.mapCoordsStat) {
+        elements.mapCoordsStat.textContent = formatCoordinatesDisplay(state.myCoords.latitude, state.myCoords.longitude);
+      }
+      if (elements.mapGpsStatus) {
+        elements.mapGpsStatus.textContent = `Fix (${state.myCoords.latitude.toFixed(4)}, ${state.myCoords.longitude.toFixed(4)})`;
+        elements.mapGpsStatus.classList.add('active');
+      }
     }
   }
 
@@ -4388,17 +4526,18 @@
     if (!w || !h) return;
 
     drawnPeerHitboxes = [];
+    drawnWaypointHitboxes = [];
 
     const isDark = document.body.classList.contains('dark-theme') || document.body.classList.contains('red-vision-theme');
-    mapCanvasCtx.fillStyle = isDark ? '#0d111a' : '#141824';
+    mapCanvasCtx.fillStyle = isDark ? '#0b0f19' : '#141824';
     mapCanvasCtx.fillRect(0, 0, w, h);
 
     const centerX = w / 2;
     const centerY = h / 2;
-    const maxRadius = Math.min(centerX, centerY) - 36;
+    const maxRadius = Math.min(centerX, centerY) - 40;
 
     // Draw Grid Lines
-    mapCanvasCtx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.08)';
+    mapCanvasCtx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(255, 255, 255, 0.07)';
     mapCanvasCtx.lineWidth = 1;
     const gridSize = 45;
     for (let x = centerX % gridSize; x < w; x += gridSize) {
@@ -4434,6 +4573,11 @@
     let currentRange = Math.max(200, Math.ceil((maxDistMeters * 1.3) / 50) * 50) / mapManualZoom;
     if (currentRange > 100000) currentRange = 100000;
 
+    if (elements.mapHudRangeTag) {
+      const rangeStr = currentRange >= 1000 ? `${(currentRange / 1000).toFixed(1)}km` : `${Math.round(currentRange)}m`;
+      elements.mapHudRangeTag.textContent = `RANGE: ${rangeStr} • AZIMUTH: 360° BEZEL`;
+    }
+
     // Helper: Convert Lat/Lon to Canvas Pixel Coordinates using Great-Circle Bearing & Distance
     function coordsToPixel(lat, lon) {
       const dist = calculateDistanceMeters(myLat, myLon, lat, lon);
@@ -4446,7 +4590,7 @@
       return { px, py, dist, rawBearing };
     }
 
-    // Draw 3 Concentric Radar Range Rings
+    // 1. Draw 3 Concentric Radar Range Rings
     const ringFractions = [0.333, 0.666, 1.0];
     ringFractions.forEach((frac) => {
       const r = maxRadius * frac;
@@ -4464,24 +4608,69 @@
       mapCanvasCtx.fillText(label, centerX + r - 30, centerY - 4);
     });
 
-    // Draw Crosshairs & Cardinal Labels
-    mapCanvasCtx.beginPath();
-    mapCanvasCtx.moveTo(centerX, centerY - maxRadius);
-    mapCanvasCtx.lineTo(centerX, centerY + maxRadius);
-    mapCanvasCtx.moveTo(centerX - maxRadius, centerY);
-    mapCanvasCtx.lineTo(centerX + maxRadius, centerY);
-    mapCanvasCtx.strokeStyle = 'rgba(0, 122, 255, 0.12)';
-    mapCanvasCtx.lineWidth = 1;
-    mapCanvasCtx.stroke();
+    // 2. Draw 360° Military Azimuth Compass Rose Bezel
+    mapCanvasCtx.save();
+    for (let deg = 0; deg < 360; deg += 5) {
+      const isMajor = deg % 30 === 0;
+      const isCard = deg % 90 === 0;
+      const tickAngle = (deg - 90) * (Math.PI / 180);
+      const outerR = maxRadius;
+      const innerR = isMajor ? maxRadius - 9 : maxRadius - 4;
 
-    mapCanvasCtx.fillStyle = 'rgba(0, 122, 255, 0.7)';
-    mapCanvasCtx.font = 'bold 11px -apple-system, sans-serif';
-    mapCanvasCtx.fillText('N', centerX - 4, centerY - maxRadius + 14);
-    mapCanvasCtx.fillText('S', centerX - 4, centerY + maxRadius - 6);
-    mapCanvasCtx.fillText('E', centerX + maxRadius - 14, centerY + 4);
-    mapCanvasCtx.fillText('W', centerX - maxRadius + 6, centerY + 4);
+      mapCanvasCtx.beginPath();
+      mapCanvasCtx.moveTo(centerX + outerR * Math.cos(tickAngle), centerY + outerR * Math.sin(tickAngle));
+      mapCanvasCtx.lineTo(centerX + innerR * Math.cos(tickAngle), centerY + innerR * Math.sin(tickAngle));
+      mapCanvasCtx.strokeStyle = isCard ? 'rgba(0, 122, 255, 0.8)' : (isMajor ? 'rgba(255, 255, 255, 0.45)' : 'rgba(255, 255, 255, 0.15)');
+      mapCanvasCtx.lineWidth = isCard ? 2 : (isMajor ? 1.5 : 1);
+      mapCanvasCtx.stroke();
 
-    // Geofence Circle
+      if (isMajor) {
+        const textR = maxRadius + 14;
+        const textX = centerX + textR * Math.cos(tickAngle);
+        const textY = centerY + textR * Math.sin(tickAngle);
+        mapCanvasCtx.font = '9px monospace';
+        mapCanvasCtx.fillStyle = isCard ? '#007aff' : 'rgba(255, 255, 255, 0.6)';
+        mapCanvasCtx.textAlign = 'center';
+        mapCanvasCtx.textBaseline = 'middle';
+        
+        let label = String(deg).padStart(3, '0');
+        if (deg === 0) label = 'N';
+        else if (deg === 90) label = 'E';
+        else if (deg === 180) label = 'S';
+        else if (deg === 270) label = 'W';
+        
+        mapCanvasCtx.fillText(label, textX, textY);
+      }
+    }
+    mapCanvasCtx.restore();
+
+    // 3. Draw Rotating Tactical Radar Beam Sweep
+    if (state.radarSweepEnabled) {
+      mapCanvasCtx.save();
+      const sweepRad = (state.radarSweepAngle - 90) * (Math.PI / 180);
+      
+      const sweepGrad = mapCanvasCtx.createConicGradient(sweepRad, centerX, centerY);
+      sweepGrad.addColorStop(0, 'rgba(0, 122, 255, 0.28)');
+      sweepGrad.addColorStop(0.08, 'rgba(0, 122, 255, 0.06)');
+      sweepGrad.addColorStop(0.2, 'rgba(0, 122, 255, 0)');
+      sweepGrad.addColorStop(1, 'rgba(0, 122, 255, 0)');
+
+      mapCanvasCtx.beginPath();
+      mapCanvasCtx.arc(centerX, centerY, maxRadius, 0, Math.PI * 2);
+      mapCanvasCtx.fillStyle = sweepGrad;
+      mapCanvasCtx.fill();
+
+      // Lead line
+      mapCanvasCtx.beginPath();
+      mapCanvasCtx.moveTo(centerX, centerY);
+      mapCanvasCtx.lineTo(centerX + maxRadius * Math.cos(sweepRad), centerY + maxRadius * Math.sin(sweepRad));
+      mapCanvasCtx.strokeStyle = 'rgba(0, 122, 255, 0.75)';
+      mapCanvasCtx.lineWidth = 1.5;
+      mapCanvasCtx.stroke();
+      mapCanvasCtx.restore();
+    }
+
+    // 4. Geofence Circle
     if (state.geofence.enabled && state.geofence.originCoords) {
       const gPos = coordsToPixel(state.geofence.originCoords.latitude, state.geofence.originCoords.longitude);
       const pixelRadius = (state.geofence.radiusMeters / currentRange) * maxRadius;
@@ -4497,7 +4686,7 @@
       mapCanvasCtx.setLineDash([]);
     }
 
-    // Breadcrumb Trail
+    // 5. Breadcrumb Trail
     if (state.myTrail.length > 1) {
       mapCanvasCtx.beginPath();
       mapCanvasCtx.strokeStyle = '#34c759';
@@ -4513,9 +4702,38 @@
       mapCanvasCtx.setLineDash([]);
     }
 
-    // Waypoints
+    // 6. Active Emergency Distress Flares
+    const nowTime = Date.now();
+    state.mapFlares = state.mapFlares.filter(f => nowTime - f.timestamp < 120000); // 2 min lifespan
+    state.mapFlares.forEach(flare => {
+      const p = coordsToPixel(flare.lat, flare.lon);
+      const age = (nowTime - flare.timestamp) / 1000;
+      const pulseSize = 10 + (age % 3) * 12;
+
+      mapCanvasCtx.beginPath();
+      mapCanvasCtx.arc(p.px, p.py, pulseSize, 0, Math.PI * 2);
+      mapCanvasCtx.strokeStyle = 'rgba(255, 59, 48, 0.8)';
+      mapCanvasCtx.lineWidth = 2;
+      mapCanvasCtx.stroke();
+
+      mapCanvasCtx.font = '20px sans-serif';
+      mapCanvasCtx.fillText('🚨', p.px - 10, p.py + 6);
+      mapCanvasCtx.font = 'bold 11px -apple-system, sans-serif';
+      mapCanvasCtx.fillStyle = '#ff3b30';
+      mapCanvasCtx.fillText(`FLARE: ${flare.senderName || 'SOS'}`, p.px + 12, p.py + 4);
+    });
+
+    // 7. Waypoints
     state.waypoints.forEach(wp => {
       const p = coordsToPixel(wp.lat, wp.lon);
+      drawnWaypointHitboxes.push({
+        id: wp.id,
+        x: p.px,
+        y: p.py,
+        radius: 16,
+        wp
+      });
+
       mapCanvasCtx.font = '18px sans-serif';
       mapCanvasCtx.fillText(wp.icon || '📍', p.px - 9, p.py + 6);
 
@@ -4524,7 +4742,7 @@
       mapCanvasCtx.fillText(wp.name, p.px - 18, p.py + 22);
     });
 
-    // Mesh Peers Radar Beacons & Markers
+    // 8. Mesh Peers Radar Beacons & Markers
     state.peerLocations.forEach((peer, peerId) => {
       if (peerId === state.self.id || !peer.coords) return;
       const p = coordsToPixel(peer.coords.latitude, peer.coords.longitude);
@@ -4569,7 +4787,7 @@
       mapCanvasCtx.fillText(`${distFormatted} (${cardDir})`, p.px + 10, p.py + 11);
     });
 
-    // Self Position Marker & Compass Heading Pointer
+    // 9. Self Position Marker & Compass Heading Pointer
     mapCanvasCtx.save();
     mapCanvasCtx.translate(centerX, centerY);
     mapCanvasCtx.rotate(state.myHeading * Math.PI / 180);
@@ -4611,8 +4829,104 @@
       });
     }
 
+    if (elements.btnToggleRadarSweep) {
+      elements.btnToggleRadarSweep.addEventListener('click', () => {
+        state.radarSweepEnabled = !state.radarSweepEnabled;
+        elements.btnToggleRadarSweep.textContent = state.radarSweepEnabled ? '📡 Sweep: ON' : '📡 Sweep: OFF';
+        drawMap();
+      });
+    }
+
+    if (elements.mapCoordsStat) {
+      elements.mapCoordsStat.addEventListener('click', () => {
+        state.coordFormat = state.coordFormat === 'DD' ? 'DMS' : 'DD';
+        localStorage.setItem('mesh_coord_fmt', state.coordFormat);
+        updateMapStats();
+      });
+    }
+
+    if (elements.btnDropFlare) {
+      elements.btnDropFlare.addEventListener('click', triggerEmergencyFlare);
+    }
+
+    if (elements.btnDrawerFlare) {
+      elements.btnDrawerFlare.addEventListener('click', () => {
+        triggerEmergencyFlare();
+        if (elements.mapDrawerOverlay) elements.mapDrawerOverlay.classList.remove('active');
+      });
+    }
+
     if (elements.btnDropWaypoint) {
       elements.btnDropWaypoint.addEventListener('click', openWaypointModal);
+    }
+
+    if (elements.btnOpenSquadDrawer) {
+      elements.btnOpenSquadDrawer.addEventListener('click', () => {
+        openTacticalDrawer('squad');
+      });
+    }
+
+    if (elements.btnOpenWaypointsVault) {
+      elements.btnOpenWaypointsVault.addEventListener('click', () => {
+        openTacticalDrawer('waypoints');
+      });
+    }
+
+    if (elements.mapDrawerCloseBtn) {
+      elements.mapDrawerCloseBtn.addEventListener('click', () => {
+        if (elements.mapDrawerOverlay) elements.mapDrawerOverlay.classList.remove('active');
+      });
+    }
+
+    if (elements.tabTacticalSquad) {
+      elements.tabTacticalSquad.addEventListener('click', () => switchTacticalTab('squad'));
+    }
+    if (elements.tabTacticalWaypoints) {
+      elements.tabTacticalWaypoints.addEventListener('click', () => switchTacticalTab('waypoints'));
+    }
+    if (elements.tabTacticalTools) {
+      elements.tabTacticalTools.addEventListener('click', () => switchTacticalTab('tools'));
+    }
+
+    if (elements.btnDrawerAddWaypoint) {
+      elements.btnDrawerAddWaypoint.addEventListener('click', () => {
+        if (elements.mapDrawerOverlay) elements.mapDrawerOverlay.classList.remove('active');
+        openWaypointModal();
+      });
+    }
+
+    if (elements.btnCoordFmtDd) {
+      elements.btnCoordFmtDd.addEventListener('click', () => {
+        state.coordFormat = 'DD';
+        localStorage.setItem('mesh_coord_fmt', 'DD');
+        elements.btnCoordFmtDd.classList.add('active');
+        if (elements.btnCoordFmtDms) elements.btnCoordFmtDms.classList.remove('active');
+        updateMapStats();
+      });
+    }
+
+    if (elements.btnCoordFmtDms) {
+      elements.btnCoordFmtDms.addEventListener('click', () => {
+        state.coordFormat = 'DMS';
+        localStorage.setItem('mesh_coord_fmt', 'DMS');
+        elements.btnCoordFmtDms.classList.add('active');
+        if (elements.btnCoordFmtDd) elements.btnCoordFmtDd.classList.remove('active');
+        updateMapStats();
+      });
+    }
+
+    if (elements.btnExportGpx) {
+      elements.btnExportGpx.addEventListener('click', exportTrailAsGpx);
+    }
+    if (elements.btnExportGeojson) {
+      elements.btnExportGeojson.addEventListener('click', exportTrailAsGeoJson);
+    }
+
+    if (elements.btnCancelGuide) {
+      elements.btnCancelGuide.addEventListener('click', () => {
+        state.guidedTarget = null;
+        if (elements.peerGuideRadar) elements.peerGuideRadar.style.display = 'none';
+      });
     }
 
     if (elements.btnToggleElevationPanel) {
@@ -4656,6 +4970,19 @@
           elements.mapPeerCard.style.display = 'none';
           switchView('chat');
           selectChatTarget(mapSelectedPeerId);
+        }
+      });
+    }
+
+    if (elements.btnMapGuidePeer) {
+      elements.btnMapGuidePeer.addEventListener('click', () => {
+        if (mapSelectedPeerId) {
+          const peer = state.peerLocations.get(mapSelectedPeerId);
+          if (peer && peer.coords) {
+            state.guidedTarget = { name: peer.name, lat: peer.coords.latitude, lon: peer.coords.longitude };
+            elements.mapPeerCard.style.display = 'none';
+            updateCompassDisplay();
+          }
         }
       });
     }
@@ -4726,6 +5053,261 @@
     });
   }
 
+  function triggerEmergencyFlare() {
+    const lat = state.myCoords ? state.myCoords.latitude : 17.3850;
+    const lon = state.myCoords ? state.myCoords.longitude : 78.4867;
+    const flare = {
+      id: 'flare_' + Date.now(),
+      lat,
+      lon,
+      senderName: state.self.name,
+      timestamp: Date.now()
+    };
+
+    state.mapFlares.push(flare);
+    try { playSound('sos_beep'); } catch (e) {}
+
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+      state.ws.send(JSON.stringify({
+        type: 'MAP_FLARE',
+        flare,
+        senderName: state.self.name
+      }));
+    }
+
+    if (state.activeView === 'map') drawMap();
+    alert('🚨 Emergency distress flare broadcasted to all mesh peers on radar!');
+  }
+
+  function openTacticalDrawer(tabName) {
+    if (elements.mapDrawerOverlay) {
+      elements.mapDrawerOverlay.classList.add('active');
+      switchTacticalTab(tabName || 'squad');
+    }
+  }
+
+  function switchTacticalTab(tab) {
+    if (elements.tabTacticalSquad) elements.tabTacticalSquad.classList.toggle('active', tab === 'squad');
+    if (elements.tabTacticalWaypoints) elements.tabTacticalWaypoints.classList.toggle('active', tab === 'waypoints');
+    if (elements.tabTacticalTools) elements.tabTacticalTools.classList.toggle('active', tab === 'tools');
+
+    if (elements.paneTacticalSquad) elements.paneTacticalSquad.style.display = tab === 'squad' ? 'block' : 'none';
+    if (elements.paneTacticalWaypoints) elements.paneTacticalWaypoints.style.display = tab === 'waypoints' ? 'block' : 'none';
+    if (elements.paneTacticalTools) elements.paneTacticalTools.style.display = tab === 'tools' ? 'block' : 'none';
+
+    if (tab === 'squad') renderSquadRadarDrawer();
+    else if (tab === 'waypoints') renderWaypointsVaultDrawer();
+  }
+
+  function renderSquadRadarDrawer() {
+    if (!elements.squadRadarList) return;
+    elements.squadRadarList.innerHTML = '';
+
+    const myLat = state.myCoords ? state.myCoords.latitude : 17.3850;
+    const myLon = state.myCoords ? state.myCoords.longitude : 78.4867;
+    const peersArray = Array.from(state.peers.values()).filter(p => p.id !== state.self.id);
+
+    if (peersArray.length === 0) {
+      elements.squadRadarList.innerHTML = `
+        <div style="text-align: center; padding: 20px; color: var(--text-secondary); font-size: 13px;">
+          No other peers connected to mesh. Share the URL or hotspot to connect squad devices.
+        </div>
+      `;
+      return;
+    }
+
+    peersArray.forEach(peer => {
+      const loc = state.peerLocations.get(peer.id);
+      let distStr = 'Searching location...';
+      let bearingStr = '';
+      let rawBearing = 0;
+
+      if (loc && loc.coords) {
+        const d = calculateDistanceMeters(myLat, myLon, loc.coords.latitude, loc.coords.longitude);
+        distStr = d < 1000 ? `${Math.round(d)}m away` : `${(d / 1000).toFixed(2)}km away`;
+        rawBearing = calculateRawBearing(myLat, myLon, loc.coords.latitude, loc.coords.longitude);
+        const cardDir = calculateBearing(myLat, myLon, loc.coords.latitude, loc.coords.longitude);
+        bearingStr = `• ${cardDir} (${Math.round(rawBearing)}°)`;
+      }
+
+      const card = document.createElement('div');
+      card.className = 'squad-item-card';
+      card.innerHTML = `
+        <div class="squad-item-meta">
+          <div class="squad-item-name">
+            <span>${escapeHtml(peer.name)}</span>
+            <span style="font-size: 10px; color: #34c759; font-weight: 500;">● Online</span>
+          </div>
+          <div class="squad-item-sub">${distStr} ${bearingStr}</div>
+        </div>
+        <div class="squad-item-actions">
+          ${loc && loc.coords ? `<button type="button" class="btn btn-secondary btn-sm btn-guide-peer" data-peer-id="${peer.id}" style="padding: 4px 8px; font-size: 11px;">🎯 Guide</button>` : ''}
+          <button type="button" class="btn btn-primary btn-sm btn-chat-peer" data-peer-id="${peer.id}" style="padding: 4px 8px; font-size: 11px;">💬 Chat</button>
+        </div>
+      `;
+
+      const guideBtn = card.querySelector('.btn-guide-peer');
+      if (guideBtn) {
+        guideBtn.addEventListener('click', () => {
+          if (loc && loc.coords) {
+            state.guidedTarget = { name: peer.name, lat: loc.coords.latitude, lon: loc.coords.longitude };
+            if (elements.mapDrawerOverlay) elements.mapDrawerOverlay.classList.remove('active');
+            updateCompassDisplay();
+          }
+        });
+      }
+
+      const chatBtn = card.querySelector('.btn-chat-peer');
+      if (chatBtn) {
+        chatBtn.addEventListener('click', () => {
+          if (elements.mapDrawerOverlay) elements.mapDrawerOverlay.classList.remove('active');
+          switchView('chat');
+          selectChatTarget(peer.id);
+        });
+      }
+
+      elements.squadRadarList.appendChild(card);
+    });
+  }
+
+  function renderWaypointsVaultDrawer() {
+    if (!elements.waypointsVaultList) return;
+    elements.waypointsVaultList.innerHTML = '';
+
+    if (state.waypoints.length === 0) {
+      elements.waypointsVaultList.innerHTML = `
+        <div style="text-align: center; padding: 20px; color: var(--text-secondary); font-size: 13px;">
+          No waypoints pinned. Tap <strong>+ New Waypoint</strong> to drop tactical markers for the mesh.
+        </div>
+      `;
+      return;
+    }
+
+    const myLat = state.myCoords ? state.myCoords.latitude : 17.3850;
+    const myLon = state.myCoords ? state.myCoords.longitude : 78.4867;
+
+    state.waypoints.forEach(wp => {
+      const d = calculateDistanceMeters(myLat, myLon, wp.lat, wp.lon);
+      const distStr = d < 1000 ? `${Math.round(d)}m away` : `${(d / 1000).toFixed(2)}km away`;
+      const cardDir = calculateBearing(myLat, myLon, wp.lat, wp.lon);
+
+      const card = document.createElement('div');
+      card.className = 'waypoint-item-card';
+      card.innerHTML = `
+        <div class="waypoint-item-meta">
+          <div class="waypoint-item-name">
+            <span>${wp.icon || '📍'}</span>
+            <span>${escapeHtml(wp.name)}</span>
+          </div>
+          <div class="waypoint-item-sub">${distStr} • ${cardDir} • ${wp.lat.toFixed(4)}, ${wp.lon.toFixed(4)}</div>
+        </div>
+        <div class="waypoint-item-actions">
+          <button type="button" class="btn btn-secondary btn-sm btn-guide-wp" style="padding: 4px 8px; font-size: 11px;" title="Guide heading arrow to waypoint">🎯</button>
+          <button type="button" class="btn btn-secondary btn-sm btn-share-wp" style="padding: 4px 8px; font-size: 11px;" title="Share waypoint in chat">📤</button>
+          <button type="button" class="btn btn-secondary btn-sm btn-delete-wp" style="padding: 4px 8px; font-size: 11px; color: #ff3b30;" title="Delete waypoint">🗑️</button>
+        </div>
+      `;
+
+      card.querySelector('.btn-guide-wp').addEventListener('click', () => {
+        state.guidedTarget = { name: wp.name, lat: wp.lat, lon: wp.lon };
+        if (elements.mapDrawerOverlay) elements.mapDrawerOverlay.classList.remove('active');
+        updateCompassDisplay();
+      });
+
+      card.querySelector('.btn-share-wp').addEventListener('click', () => {
+        shareWaypointIntoChat(wp);
+        if (elements.mapDrawerOverlay) elements.mapDrawerOverlay.classList.remove('active');
+        switchView('chat');
+      });
+
+      card.querySelector('.btn-delete-wp').addEventListener('click', () => {
+        state.waypoints = state.waypoints.filter(w => w.id !== wp.id);
+        localStorage.setItem('mesh_waypoints', JSON.stringify(state.waypoints));
+        if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+          state.ws.send(JSON.stringify({
+            type: 'WAYPOINT_DELETE',
+            waypointId: wp.id
+          }));
+        }
+        renderWaypointsVaultDrawer();
+        if (state.activeView === 'map') drawMap();
+      });
+
+      elements.waypointsVaultList.appendChild(card);
+    });
+  }
+
+  async function shareWaypointIntoChat(wp) {
+    const text = `📍 Waypoint Pin: ${wp.icon || '📍'} ${wp.name} (${wp.lat.toFixed(4)}, ${wp.lon.toFixed(4)})`;
+    const msg = {
+      id: 'msg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+      senderId: state.self.id,
+      senderName: state.self.name,
+      targetId: state.activeTargetId,
+      channelId: state.activeTargetId === 'broadcast' ? state.activeChannelId : null,
+      text: text,
+      timestamp: Date.now()
+    };
+    await dispatchMessage(msg);
+  }
+
+  function exportTrailAsGpx() {
+    const points = state.myTrail;
+    let gpx = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="MeshChat Tactical" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>MeshChat Trail ${new Date().toLocaleDateString()}</name>
+    <trkseg>
+`;
+    points.forEach(pt => {
+      const timeIso = new Date(pt.time || Date.now()).toISOString();
+      gpx += `      <trkpt lat="${pt.lat}" lon="${pt.lon}"><time>${timeIso}</time></trkpt>\n`;
+    });
+    gpx += `    </trkseg>
+  </trk>
+</gpx>`;
+
+    const blob = new Blob([gpx], { type: 'application/gpx+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `meshchat_trail_${Date.now()}.gpx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function exportTrailAsGeoJson() {
+    const geojson = {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          properties: { name: "MeshChat Trail" },
+          geometry: {
+            type: "LineString",
+            coordinates: state.myTrail.map(pt => [pt.lon, pt.lat])
+          }
+        },
+        ...state.waypoints.map(wp => ({
+          type: "Feature",
+          properties: { name: wp.name, icon: wp.icon },
+          geometry: {
+            type: "Point",
+            coordinates: [wp.lon, wp.lat]
+          }
+        }))
+      ]
+    };
+
+    const blob = new Blob([JSON.stringify(geojson, null, 2)], { type: 'application/geo+json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `meshchat_map_${Date.now()}.geojson`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   function openWaypointModal() {
     elements.waypointNameInput.value = '';
     elements.waypointModalOverlay.classList.add('active');
@@ -4743,7 +5325,7 @@
     const wp = {
       id: 'wp_' + Date.now(),
       name: name,
-      icon: pttSelectedIcon,
+      icon: pttSelectedIcon || '📍',
       lat: lat,
       lon: lon,
       timestamp: Date.now()
@@ -4760,7 +5342,10 @@
     }
 
     closeWaypointModal();
-    if (state.activeView === 'map') drawMap();
+    if (state.activeView === 'map') {
+      drawMap();
+      renderWaypointsVaultDrawer();
+    }
   }
 
   // --- 37. Peer List Rendering ---

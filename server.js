@@ -10,7 +10,7 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || process.argv[2] || 3000;
 
 // Helper to get local network IP addresses
 function getLocalIPAddresses() {
@@ -867,6 +867,25 @@ wss.on('connection', (ws, req) => {
             type: 'WAYPOINT_ADD',
             waypoint: data.waypoint,
             senderId: currentPeerId
+          });
+          break;
+        }
+
+        case 'WAYPOINT_DELETE': {
+          broadcast({
+            type: 'WAYPOINT_DELETE',
+            waypointId: data.waypointId,
+            senderId: currentPeerId
+          });
+          break;
+        }
+
+        case 'MAP_FLARE': {
+          broadcast({
+            type: 'MAP_FLARE',
+            flare: data.flare,
+            senderId: currentPeerId,
+            senderName: data.senderName
           });
           break;
         }
