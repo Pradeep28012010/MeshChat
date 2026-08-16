@@ -10,7 +10,7 @@
   <link rel="manifest" href="./manifest.json">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <link rel="stylesheet" href="./styles.css?v=4.4">
+  <link rel="stylesheet" href="./styles.css?v=4.5">
   <title>MeshChat — Online Cloud & Offline Mesh Suite</title>
 </head>
 <body>
@@ -438,6 +438,13 @@
       </div>
 
       <div class="map-canvas-container" style="position: relative; width: 100%; height: 100%; overflow: hidden;">
+        <!-- 🔍 Place / City / Address Quick Search & Calibration Bar -->
+        <div class="map-search-bar-wrap" style="position: absolute; top: 14px; left: 14px; z-index: 30; display: flex; align-items: center; background: rgba(15, 23, 42, 0.92); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 24px; padding: 4px 12px; backdrop-filter: blur(16px); box-shadow: 0 6px 20px rgba(0,0,0,0.5); max-width: 340px; width: calc(100% - 28px);">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px; flex-shrink: 0;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="map-place-search-input" placeholder="Search city, area or street..." style="background: none; border: none; outline: none; color: #ffffff; font-size: 12.5px; width: 100%;" autocomplete="off" />
+          <button type="button" id="btn-search-place" class="btn btn-primary btn-sm" style="padding: 4px 10px; font-size: 11px; margin-left: 6px; border-radius: 14px; flex-shrink: 0; font-weight: 700;">Find</button>
+        </div>
+
         <!-- 🌐 Online Interactive GPS Street & Satellite Map (Leaflet) -->
         <div id="online-leaflet-map" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0; display: none; z-index: 1;"></div>
         
@@ -1917,6 +1924,6 @@
     </div>
   </div>
 
-  <script src="./app.js?v=4.4"></script>
+  <script src="./app.js?v=4.5"></script>
 </body>
 </html>

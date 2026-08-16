@@ -913,9 +913,10 @@
     mapPeerCardDist: document.getElementById('map-peer-card-dist'),
     btnCloseMapPeerCard: document.getElementById('btn-close-map-peer-card'),
     btnMapChatPeer: document.getElementById('btn-map-chat-peer'),
-    btnMapGuidePeer: document.getElementById('btn-map-guide-peer'),
     onlineLeafletMap: document.getElementById('online-leaflet-map'),
     btnToggleMapMode: document.getElementById('btn-toggle-map-mode'),
+    mapPlaceSearchInput: document.getElementById('map-place-search-input'),
+    btnSearchPlace: document.getElementById('btn-search-place'),
     mapHudRangeTag: document.getElementById('map-hud-range-tag'),
     btnMapZoomIn: document.getElementById('btn-map-zoom-in'),
     btnMapZoomOut: document.getElementById('btn-map-zoom-out'),
@@ -4595,13 +4596,41 @@
         leafletMap._userPanned = true;
       });
 
-      // Click on Online Map to Drop Waypoint Pin
+      // Click on Online Map: Interactive Location Calibration & Waypoint Popup
       leafletMap.on('click', (e) => {
-        if (elements.wpLatInput && elements.wpLonInput) {
-          elements.wpLatInput.value = e.latlng.lat.toFixed(6);
-          elements.wpLonInput.value = e.latlng.lng.toFixed(6);
-          openWaypointModal();
-        }
+        const lat = e.latlng.lat;
+        const lon = e.latlng.lng;
+
+        const popupContent = document.createElement('div');
+        popupContent.style.minWidth = '180px';
+        popupContent.style.textAlign = 'center';
+        popupContent.innerHTML = `
+          <strong style="color: #38bdf8; font-size: 12.5px;">📍 Selected Map Position</strong>
+          <div style="font-size: 11px; opacity: 0.8; margin: 4px 0;">${lat.toFixed(5)}°, ${lon.toFixed(5)}°</div>
+          <div style="display: flex; flex-direction: column; gap: 5px; margin-top: 8px;">
+            <button type="button" class="btn btn-primary btn-sm btn-popup-set-gps" style="font-size: 11px; font-weight: 700; background: #007aff; padding: 5px 8px;">🎯 Set as My Live GPS Location</button>
+            <button type="button" class="btn btn-secondary btn-sm btn-popup-drop-wp" style="font-size: 11px; padding: 4px 8px;">🚩 Drop Waypoint Pin</button>
+          </div>
+        `;
+
+        const popup = L.popup()
+          .setLatLng([lat, lon])
+          .setContent(popupContent)
+          .openOn(leafletMap);
+
+        popupContent.querySelector('.btn-popup-set-gps').onclick = () => {
+          setManualGpsLocation(lat, lon, 'Custom Map Pick');
+          leafletMap.closePopup();
+        };
+
+        popupContent.querySelector('.btn-popup-drop-wp').onclick = () => {
+          leafletMap.closePopup();
+          if (elements.wpLatInput && elements.wpLonInput) {
+            elements.wpLatInput.value = lat.toFixed(6);
+            elements.wpLonInput.value = lon.toFixed(6);
+            openWaypointModal();
+          }
+        };
       });
 
       setTimeout(() => {
@@ -4617,6 +4646,76 @@
       console.warn('[Leaflet] Init error:', e);
     }
   }
+
+  async function searchPlaceAndCenter(query) {
+    const q = (query || '').trim();
+    if (!q) return;
+
+    if (elements.btnSearchPlace) elements.btnSearchPlace.textContent = '...';
+
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`, {
+        headers: { 'Accept-Language': 'en' }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.length > 0) {
+          const lat = parseFloat(data[0].lat);
+          const lon = parseFloat(data[0].lon);
+          const name = data[0].display_name.split(',')[0] || q;
+
+          if (leafletMap) {
+            leafletMap._userPanned = true;
+            leafletMap.setView([lat, lon], 16);
+
+            const popupContent = document.createElement('div');
+            popupContent.style.minWidth = '190px';
+            popupContent.style.textAlign = 'center';
+            popupContent.innerHTML = `
+              <strong style="color: #38bdf8; font-size: 13px;">🔍 ${escapeHtml(name)}</strong>
+              <div style="font-size: 10.5px; opacity: 0.8; margin: 4px 0;">${lat.toFixed(5)}°, ${lon.toFixed(5)}°</div>
+              <button type="button" class="btn btn-primary btn-sm btn-popup-set-searched" style="width: 100%; margin-top: 6px; font-weight: 700; font-size: 11px; background: #007aff; padding: 6px;">🎯 Set as My Live GPS Location</button>
+            `;
+
+            const searchPopup = L.popup()
+              .setLatLng([lat, lon])
+              .setContent(popupContent)
+              .openOn(leafletMap);
+
+            popupContent.querySelector('.btn-popup-set-searched').onclick = () => {
+              setManualGpsLocation(lat, lon, name);
+              leafletMap.closePopup();
+            };
+          }
+          showNotificationToast(`📍 Found "${name}"! Click "Set as My Live GPS" in the popup to calibrate.`);
+        } else {
+          showNotificationToast('⚠️ Place not found. Try searching your city, area, or landmark.');
+        }
+      }
+    } catch (e) {
+      showNotificationToast('⚠️ Search service unreachable. Check connection.');
+    } finally {
+      if (elements.btnSearchPlace) elements.btnSearchPlace.textContent = 'Find';
+    }
+  }
+
+  function setManualGpsLocation(lat, lon, label) {
+    const coords = {
+      latitude: lat,
+      longitude: lon,
+      altitude: 45,
+      heading: state.myHeading || 0,
+      speed: 0,
+      accuracy: 2
+    };
+
+    localStorage.setItem('mesh_manual_coords', JSON.stringify(coords));
+    localStorage.setItem('mesh_last_coords', JSON.stringify(coords));
+    onGpsFixAcquired(coords, label || 'Calibrated GPS');
+    showNotificationToast(`🎯 GPS Calibrated: ${label || 'Exact Location'} (${lat.toFixed(4)}, ${lon.toFixed(4)})`);
+  }
+
+  window.setManualGpsLocation = setManualGpsLocation;
 
   function setLeafletTileLayer(layerType) {
     if (!leafletMap || !window.L) return;
@@ -4699,9 +4798,9 @@
     const myLat = state.myCoords ? state.myCoords.latitude : 17.3850;
     const myLon = state.myCoords ? state.myCoords.longitude : 78.4867;
 
-    // 1. Self Marker
+    // 1. Draggable Self Marker for Instant Pin-Point Calibration
     const selfIconHtml = `
-      <div class="leaflet-self-beacon">
+      <div class="leaflet-self-beacon" title="Drag me to calibrate your exact location!">
         <div class="leaflet-pulse-ring"></div>
         <div class="leaflet-beacon-dot">${state.self.avatar ? `<img src="${state.self.avatar}">` : getInitials(state.self.name)}</div>
       </div>
@@ -4717,8 +4816,13 @@
       leafletSelfMarker.setLatLng([myLat, myLon]);
       leafletSelfMarker.setIcon(selfIcon);
     } else {
-      leafletSelfMarker = L.marker([myLat, myLon], { icon: selfIcon }).addTo(leafletMap);
-      leafletSelfMarker.bindPopup(`<b>You (${escapeHtml(state.self.name)})</b><br>Lat: ${myLat.toFixed(5)}<br>Lon: ${myLon.toFixed(5)}`);
+      leafletSelfMarker = L.marker([myLat, myLon], { icon: selfIcon, draggable: true }).addTo(leafletMap);
+      leafletSelfMarker.bindPopup(`<b>You (${escapeHtml(state.self.name)})</b><br><span style="font-size: 11px; color: #38bdf8;">💡 <i>Drag & drop this marker to calibrate your exact house / street!</i></span><br>Lat: ${myLat.toFixed(5)}<br>Lon: ${myLon.toFixed(5)}`);
+
+      leafletSelfMarker.on('dragend', (e) => {
+        const pt = e.target.getLatLng();
+        setManualGpsLocation(pt.lat, pt.lng, 'Drag Calibration');
+      });
     }
 
     // 2. Peer Markers
@@ -4834,7 +4938,18 @@
       elements.mapGpsStatus.classList.remove('active');
     }
 
-    // 1. Immediately apply saved/calibrated coordinates if available so the map never jumps
+    // 1. If user previously manually calibrated their exact home location, use that first
+    const manualStored = localStorage.getItem('mesh_manual_coords');
+    if (manualStored && !forceRefresh) {
+      try {
+        const parsed = JSON.parse(manualStored);
+        if (parsed.latitude && parsed.longitude) {
+          onGpsFixAcquired(parsed, 'Calibrated GPS');
+          return;
+        }
+      } catch (e) {}
+    }
+
     const stored = localStorage.getItem('mesh_last_coords');
     if (stored && !forceRefresh) {
       try {
@@ -5334,6 +5449,19 @@
   function initMapEventListeners() {
     if (elements.btnToggleMapMode) {
       elements.btnToggleMapMode.addEventListener('click', toggleMapMode);
+    }
+
+    if (elements.btnSearchPlace && elements.mapPlaceSearchInput) {
+      elements.btnSearchPlace.addEventListener('click', () => {
+        searchPlaceAndCenter(elements.mapPlaceSearchInput.value);
+      });
+
+      elements.mapPlaceSearchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          searchPlaceAndCenter(elements.mapPlaceSearchInput.value);
+        }
+      });
     }
 
     window.addEventListener('online', () => {
